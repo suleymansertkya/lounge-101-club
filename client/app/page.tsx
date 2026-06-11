@@ -47,12 +47,533 @@ interface SohbetGonderisi {
   gorselUrl?: string;
 }
 
+// ============================================================
+// TİP TANIMLARI — Pişti ve Tavla oyun state'leri için
+// ============================================================
+interface PistiKart {
+  id: number;
+  seri: 'kupa' | 'karo' | 'maca' | 'sinek';
+  deger: string;
+  sayisalDeger: number;
+}
+
+interface PistiDurumu {
+  deste: PistiKart[];
+  yer: PistiKart[];
+  oyuncuEl: PistiKart[];
+  botEl: PistiKart[];
+  oyuncuSkor: number;
+  botSkor: number;
+  oyuncuToplanan: number;
+  botToplanan: number;
+  sira: 'oyuncu' | 'bot';
+  mesaj: string;
+  bitti: boolean;
+}
+
+interface TavlaHane { index: number; renk: 'beyaz' | 'siyah' | null; sayi: number; }
+interface TavlaDurumu {
+  tahta: TavlaHane[];
+  zar1: number; zar2: number;
+  hamleHaklari: number[];
+  oyuncuKirik: number; botKirik: number;
+  oyuncuToplanan: number; botToplanan: number;
+  sira: 'oyuncu' | 'bot';
+  mesaj: string;
+  bitti: boolean;
+  seciliHane: number | null;
+}
+
+// Istaka görsel temaları (id, çanta'daki id ile eşleşir)
+const ISTAKA_TEMALAR: Record<number, { arkaPlan: string; kenarlık: string; tasBg: string; tasMetin: string; efekt: string; isim: string }> = {
+  1: { arkaPlan: 'from-amber-800 to-amber-950', kenarlık: 'border-amber-600', tasBg: 'bg-amber-50', tasMetin: 'text-amber-900', efekt: '', isim: '🪵 Ahşap' },
+  2: { arkaPlan: 'from-neutral-900 to-gray-800', kenarlık: 'border-gray-300', tasBg: 'bg-gray-100', tasMetin: 'text-gray-900', efekt: 'shadow-[0_0_8px_rgba(255,255,255,0.6)]', isim: '🦅 Kara Kartal' },
+  3: { arkaPlan: 'from-yellow-700 to-orange-900', kenarlık: 'border-yellow-400', tasBg: 'bg-yellow-50', tasMetin: 'text-yellow-900', efekt: 'shadow-[0_0_8px_rgba(251,191,36,0.7)]', isim: '🦁 Aslan' },
+  4: { arkaPlan: 'from-blue-700 to-blue-950', kenarlık: 'border-blue-300', tasBg: 'bg-blue-50', tasMetin: 'text-blue-900', efekt: 'shadow-[0_0_8px_rgba(147,197,253,0.8)]', isim: '🌟 Kanarya' },
+  5: { arkaPlan: 'from-cyan-700 to-blue-900', kenarlık: 'border-cyan-400', tasBg: 'bg-cyan-50', tasMetin: 'text-cyan-900', efekt: 'shadow-[0_0_8px_rgba(34,211,238,0.7)]', isim: '🌊 Karadeniz' },
+  6: { arkaPlan: 'from-yellow-600 to-red-800', kenarlık: 'border-amber-400', tasBg: 'bg-amber-50', tasMetin: 'text-red-900', efekt: 'shadow-[0_0_8px_rgba(220,38,38,0.6)]', isim: '🟡🔴 Göztepe' },
+};
+
+const FUTBOL_TAKIMLARI = [
+  { id: 1, ad: "Beşiktaş",   emoji: "🦅", sembol: "BJK", renkA: "#000000", renkB: "#FFFFFF", fiyat: 0,      sahip: true  },
+  { id: 2, ad: "Galatasaray",emoji: "🦁", sembol: "GS",  renkA: "#E30A17", renkB: "#F7A800", fiyat: 50000,  sahip: false },
+  { id: 3, ad: "Fenerbahçe", emoji: "🌟", sembol: "FB",  renkA: "#0A2342", renkB: "#FFDD00", fiyat: 50000,  sahip: false },
+  { id: 4, ad: "Trabzonspor",emoji: "🌊", sembol: "TS",  renkA: "#892CA0", renkB: "#8B0000", fiyat: 40000,  sahip: false },
+  { id: 5, ad: "Başakşehir", emoji: "🏙️", sembol: "BAŞ", renkA: "#FF6600", renkB: "#001A5E", fiyat: 30000,  sahip: false },
+  { id: 6, ad: "Bursaspor",  emoji: "🐊", sembol: "BUR", renkA: "#006400", renkB: "#FFFFFF", fiyat: 25000,  sahip: false },
+];
+
+// Okey el analiz fonksiyonları
+function seriDiz(el: {id:number;renk:string;deger:number;okeyMi:boolean}[]) {
+  // Her renk için ayrı grupla, ardışık serileri bul
+  const renkler = ['kirmizi','siyah','mavi','sari'];
+  const gruplar: {id:number;renk:string;deger:number;okeyMi:boolean}[][] = [];
+  const kullanildi = new Set<number>();
+  
+  for (const renk of renkler) {
+    const ayniRenk = el.filter(t => t.renk === renk && !t.okeyMi).sort((a,b) => a.deger - b.deger);
+    let grup: typeof el = [];
+    for (let i = 0; i < ayniRenk.length; i++) {
+      if (grup.length === 0) { grup.push(ayniRenk[i]); continue; }
+      if (ayniRenk[i].deger === grup[grup.length-1].deger + 1) {
+        grup.push(ayniRenk[i]);
+      } else {
+        if (grup.length >= 3) gruplar.push([...grup]);
+        grup = [ayniRenk[i]];
+      }
+    }
+    if (grup.length >= 3) gruplar.push([...grup]);
+  }
+  gruplar.forEach(g => g.forEach(t => kullanildi.add(t.id)));
+  
+  // Jokerler ve kullanılmayanlar
+  const jokerler = el.filter(t => t.okeyMi);
+  const tekler = el.filter(t => !kullanildi.has(t.id) && !t.okeyMi);
+  return { gruplar, tekler, jokerler };
+}
+
+function ciftDiz(el: {id:number;renk:string;deger:number;okeyMi:boolean}[]) {
+  // DOĞRU OKEY ÇIFT KURALI:
+  // Aynı sayıdan, HER RENK 1'ER TANE olmak üzere 3 veya 4 farklı renk
+  // Örnek: kırmızı-3, siyah-3, mavi-3 = geçerli çift
+  // Örnek: kırmızı-3, kırmızı-3 = GEÇERSİZ (aynı renkten 2 tane olamaz)
+  const gruplar: {id:number;renk:string;deger:number;okeyMi:boolean}[][] = [];
+  const kullanildi = new Set<number>();
+  const renkSirasi = ['kirmizi', 'siyah', 'mavi', 'sari'];
+
+  for (let d = 1; d <= 13; d++) {
+    // Bu sayı için her renkten sadece 1 tane al
+    const grup: {id:number;renk:string;deger:number;okeyMi:boolean}[] = [];
+    for (const renk of renkSirasi) {
+      // Bu renkten ve sayıdan henüz kullanılmamış ilk taşı bul
+      const tas = el.find(t => t.deger === d && t.renk === renk && !t.okeyMi && !kullanildi.has(t.id));
+      if (tas) grup.push(tas);
+    }
+    // En az 3 farklı renk varsa geçerli çift
+    if (grup.length >= 3) {
+      gruplar.push(grup);
+      grup.forEach(t => kullanildi.add(t.id));
+    }
+  }
+
+  const jokerler = el.filter(t => t.okeyMi);
+  const tekler = el.filter(t => !kullanildi.has(t.id) && !t.okeyMi);
+  return { gruplar, tekler, jokerler };
+}
+
+function elPuanHesapla(gruplar: {deger:number}[][], jokerler: {deger:number}[]) {
+  let puan = 0;
+  gruplar.forEach(g => g.forEach(t => puan += t.deger));
+  jokerler.forEach(() => puan += 25); // joker sabit 25
+  return puan;
+}
+
+// ============================================================
+// OKEY OYUN TİPLERİ VE MOTORU
+// ============================================================
+type TasRengi = 'kirmizi' | 'siyah' | 'mavi' | 'sari' | 'joker';
+interface OkeyTas { id: number; renk: TasRengi; deger: number; okeyMi: boolean; }
+interface OkeyOyuncu { isim: string; el: OkeyTas[]; bot: boolean; }
+interface OkeyDurum {
+  oyuncular: OkeyOyuncu[];
+  kalanDeste: OkeyTas[];
+  gosterge: OkeyTas | null;
+  okeyRenk: TasRengi; okeyDeger: number;
+  aktifOyuncu: number; // 0 = sen
+  atilanTas: OkeyTas | null;
+  atilanTasGecmisi: { oyuncuIdx: number; tas: OkeyTas }[]; // son atılan taşlar
+  mesaj: string;
+  bitti: boolean;
+}
+
+function okeyDesteOlustur(): OkeyTas[] {
+  const deste: OkeyTas[] = [];
+  const renkler: TasRengi[] = ['kirmizi','siyah','mavi','sari'];
+  let id = 1;
+  for (const renk of renkler) for (let s=1; s<=2; s++) for (let d=1; d<=13; d++) deste.push({id:id++,renk,deger:d,okeyMi:false});
+  deste.push({id:id++,renk:'joker',deger:0,okeyMi:true});
+  deste.push({id:id++,renk:'joker',deger:0,okeyMi:true});
+  for (let i=deste.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[deste[i],deste[j]]=[deste[j],deste[i]];}
+  return deste;
+}
+
+function yeniOkeyOyunu(oyuncuIsim: string): OkeyDurum {
+  const deste = okeyDesteOlustur();
+  // Gösterge belirle
+  let gIdx = Math.floor(Math.random() * deste.length);
+  while (deste[gIdx].okeyMi) gIdx = Math.floor(Math.random() * deste.length);
+  const gosterge = deste[gIdx];
+  const okeyDeger = gosterge.deger === 13 ? 1 : gosterge.deger + 1;
+  // Taşları dağıt: 4 oyuncu — ilk oyuncuya 22, diğerlerine 21
+  const oyuncular: OkeyOyuncu[] = [
+    { isim: oyuncuIsim, el: [], bot: false },
+    { isim: 'Bot Ahmet', el: [], bot: true },
+    { isim: 'Bot Mehmet', el: [], bot: true },
+    { isim: 'Bot Zeynep', el: [], bot: true },
+  ];
+  const dagitim = [...deste];
+  oyuncular.forEach((o, i) => { o.el = dagitim.splice(0, i===0 ? 22 : 21); });
+  return { oyuncular, kalanDeste: dagitim, gosterge, okeyRenk: gosterge.renk, okeyDeger, aktifOyuncu: 0, atilanTas: null, atilanTasGecmisi: [], mesaj: 'Taş at veya çek!', bitti: false };
+}
+
+const TAS_RENK_STIL: Record<TasRengi, string> = {
+  kirmizi: 'text-red-600 border-red-300',
+  siyah:   'text-gray-900 border-gray-400',
+  mavi:    'text-blue-600 border-blue-300',
+  sari:    'text-yellow-500 border-yellow-300',
+  joker:   'text-purple-600 border-purple-300',
+};
+
+// ============================================================
+function pistiDesteOlustur(): PistiKart[] {
+  const deste: PistiKart[] = [];
+  const seriler = ['kupa','karo','maca','sinek'] as const;
+  const degerler = [
+    {d:'A',s:1},{d:'2',s:2},{d:'3',s:3},{d:'4',s:4},{d:'5',s:5},{d:'6',s:6},
+    {d:'7',s:7},{d:'8',s:8},{d:'9',s:9},{d:'10',s:10},{d:'J',s:11},{d:'Q',s:12},{d:'K',s:13}
+  ];
+  let id = 1;
+  for (const seri of seriler) for (const e of degerler) deste.push({id:id++,seri,deger:e.d,sayisalDeger:e.s});
+  for (let i = deste.length-1; i>0; i--) { const j=Math.floor(Math.random()*(i+1)); [deste[i],deste[j]]=[deste[j],deste[i]]; }
+  return deste;
+}
+
+function yeniPistiOyunu(): PistiDurumu {
+  const deste = pistiDesteOlustur();
+  const yer = deste.splice(0,4);
+  const oyuncuEl = deste.splice(0,4);
+  const botEl = deste.splice(0,4);
+  return { deste, yer, oyuncuEl, botEl, oyuncuSkor:0, botSkor:0, oyuncuToplanan:0, botToplanan:0, sira:'oyuncu', mesaj:'Kartını seç ve at!', bitti:false };
+}
+
+function kartSeriSembol(seri: string) {
+  if (seri==='kupa') return { s:'♥', c:'text-red-500' };
+  if (seri==='karo') return { s:'♦', c:'text-red-500' };
+  if (seri==='maca') return { s:'♠', c:'text-gray-900' };
+  return { s:'♣', c:'text-gray-900' };
+}
+
+function yeniTavlaOyunu(): TavlaDurumu {
+  const tahta: TavlaHane[] = Array.from({length:24},(_,i)=>({index:i+1,renk:null,sayi:0}));
+  tahta[0]  = {index:1, renk:'beyaz',sayi:2};
+  tahta[23] = {index:24,renk:'siyah',sayi:2};
+  tahta[5]  = {index:6, renk:'siyah',sayi:5};
+  tahta[18] = {index:19,renk:'beyaz',sayi:5};
+  tahta[7]  = {index:8, renk:'siyah',sayi:3};
+  tahta[16] = {index:17,renk:'beyaz',sayi:3};
+  tahta[11] = {index:12,renk:'beyaz',sayi:5};
+  tahta[12] = {index:13,renk:'siyah',sayi:5};
+  const z1=Math.floor(Math.random()*6)+1, z2=Math.floor(Math.random()*6)+1;
+  const haklar = z1===z2 ? [z1,z1,z1,z1] : [z1,z2];
+  return { tahta, zar1:z1, zar2:z2, hamleHaklari:haklar, oyuncuKirik:0, botKirik:0, oyuncuToplanan:0, botToplanan:0, sira:'oyuncu', mesaj:'Zar attın! Haneni seç.', bitti:false, seciliHane:null };
+}
+
 export default function LoungeApp() {
   const [girisYapildi, setGirisYapildi] = useState(false);
+  const [oyunSecimAcik, setOyunSecimAcik] = useState(false);
+  const [hazirTik, setHazirTik] = useState(false);
+  const [oyunBekleme, setOyunBekleme] = useState(false);
+  const [aktifOyun, setAktifOyun] = useState("");
   const [isim, setIsim] = useState("");
   const [mesaj, setMesaj] = useState("");
   const [seciliGorsel, setSeciliGorsel] = useState<string | null>(null);
-  
+
+  // --- PİŞTİ OYUN STATE ---
+  const [pistiAcik, setPistiAcik] = useState(false);
+  const [pistiDurum, setPistiDurum] = useState<PistiDurumu | null>(null);
+
+  // --- OKEY OYUN STATE ---
+  const [okeyAcik, setOkeyAcik] = useState(false);
+  const [okeyDurum, setOkeyDurum] = useState<OkeyDurum | null>(null);
+  const [okeyDizMod, setOkeyDizMod] = useState<'serbest' | 'seri' | 'cift'>('serbest');
+  const [okeySecilenTaslar, setOkeySecilenTaslar] = useState<number[]>([]);
+  const [okeyTimer, setOkeyTimer] = useState<number>(15); // geri sayım
+  const [okeyTimerAktif, setOkeyTimerAktif] = useState<boolean>(false);
+
+  // --- TAVLA OYUN STATE ---
+  const [tavlaAcik, setTavlaAcik] = useState(false);
+  const [tavlaDurum, setTavlaDurum] = useState<TavlaDurumu | null>(null);
+  const [tavlaTakimSecimAcik, setTavlaTakimSecimAcik] = useState(false);
+  const [seciliTakim, setSeciliTakim] = useState(FUTBOL_TAKIMLARI[0]);
+  const [sahipOlunanTakimlar, setSahipOlunanTakimlar] = useState<number[]>([1]);
+
+  // --- MASA AÇ FONKSİYONU ---
+  const masaAc = (oyunTuru: string) => {
+    if (oyunTuru === 'Pişti') {
+      setPistiDurum(yeniPistiOyunu());
+      setPistiAcik(true);
+      setOyunSecimAcik(false);
+      return;
+    }
+    if (oyunTuru === 'Tavla') {
+      setTavlaDurum(yeniTavlaOyunu());
+      setTavlaAcik(true);
+      setOyunSecimAcik(false);
+      return;
+    }
+    if (oyunTuru === '101 Okey') {
+      setOkeyDurum(null); // masa seçim ekranını göster
+      setOkeyAcik(true);
+      setOyunSecimAcik(false);
+      return;
+    }
+    setAktifOyun(oyunTuru);
+    setOyunSecimAcik(false);
+    setOyunBekleme(true);
+    setHazirTik(false);
+  };
+
+  // --- PİŞTİ: Kart At ---
+  const pistiKartAt = (kartId: number) => {
+    if (!pistiDurum || pistiDurum.sira !== 'oyuncu' || pistiDurum.bitti) return;
+    const d = { ...pistiDurum, oyuncuEl: [...pistiDurum.oyuncuEl], yer: [...pistiDurum.yer], deste: [...pistiDurum.deste], botEl: [...pistiDurum.botEl] };
+    const kartIdx = d.oyuncuEl.findIndex(k => k.id === kartId);
+    if (kartIdx === -1) return;
+    const [kart] = d.oyuncuEl.splice(kartIdx, 1);
+    let mesajStr = '';
+    if (d.yer.length > 0 && d.yer[d.yer.length-1].deger === kart.deger) {
+      if (d.yer.length === 1) {
+        mesajStr = `💥 PİŞTİ! +${kart.deger === 'J' ? 20 : 10} puan!`;
+        d.oyuncuSkor += kart.deger === 'J' ? 20 : 10;
+      } else {
+        mesajStr = `🎉 ${d.yer.length+1} kart toplandı!`;
+      }
+      d.oyuncuToplanan += d.yer.length + 1;
+      d.yer = [];
+    } else if (kart.deger === 'J') {
+      mesajStr = `🃏 Vale! ${d.yer.length} kart toplandı!`;
+      d.oyuncuToplanan += d.yer.length + 1;
+      d.yer = [];
+    } else {
+      d.yer.push(kart);
+      mesajStr = `Attın: ${kart.deger}`;
+    }
+    d.sira = 'bot';
+    d.mesaj = mesajStr;
+    // Kart bitmişse dağıt
+    if (d.oyuncuEl.length === 0 && d.deste.length >= 8) {
+      d.oyuncuEl = d.deste.splice(0,4);
+      d.botEl = d.deste.splice(0,4);
+    }
+    // Oyun sonu kontrolü (deste + eller bitti)
+    if (d.oyuncuEl.length === 0 && d.botEl.length === 0 && d.deste.length === 0) {
+      d.bitti = true;
+      d.sira = 'oyuncu';
+      d.mesaj = `🏁 Oyun bitti! Sen: ${d.oyuncuSkor} | Bot: ${d.botSkor}`;
+      setPistiDurum({...d});
+      return;
+    }
+    setPistiDurum({...d});
+    // Bot hamlesi
+    setTimeout(() => {
+      setPistiDurum(prev => {
+        if (!prev || prev.sira !== 'bot' || prev.bitti) return prev;
+        const bd = { ...prev, botEl: [...prev.botEl], yer: [...prev.yer], deste: [...prev.deste], oyuncuEl: [...prev.oyuncuEl] };
+        // Bot eli boşsa dağıt
+        if (bd.botEl.length === 0 && bd.deste.length >= 8) {
+          bd.oyuncuEl = bd.deste.splice(0,4);
+          bd.botEl = bd.deste.splice(0,4);
+        }
+        // Bot eli hâlâ boşsa oyun bitti
+        if (bd.botEl.length === 0) {
+          bd.bitti = true;
+          bd.sira = 'oyuncu';
+          bd.mesaj = `🏁 Oyun bitti! Sen: ${bd.oyuncuSkor} | Bot: ${bd.botSkor}`;
+          return bd;
+        }
+        // Bot stratejisi
+        let secilenIdx = 0;
+        const ustKart = bd.yer[bd.yer.length-1];
+        if (ustKart) {
+          const esIdx = bd.botEl.findIndex(k => k.deger === ustKart.deger);
+          if (esIdx !== -1) { secilenIdx = esIdx; }
+          else { const vIdx = bd.botEl.findIndex(k => k.deger === 'J'); if (vIdx !== -1) secilenIdx = vIdx; }
+        }
+        const [botKart] = bd.botEl.splice(secilenIdx, 1);
+        let bMesaj = '';
+        if (bd.yer.length > 0 && bd.yer[bd.yer.length-1].deger === botKart.deger) {
+          if (bd.yer.length === 1) { bMesaj = `🤖 Bot PİŞTİ! +${botKart.deger==='J'?20:10} puan`; bd.botSkor += botKart.deger==='J'?20:10; }
+          else bMesaj = `🤖 Bot ${bd.yer.length+1} kart topladı!`;
+          bd.botToplanan += bd.yer.length+1; bd.yer = [];
+        } else if (botKart.deger === 'J') {
+          bMesaj = `🤖 Vale! ${bd.yer.length} kart topladı!`; bd.botToplanan += bd.yer.length+1; bd.yer = [];
+        } else { bd.yer.push(botKart); bMesaj = `🤖 Bot attı: ${botKart.deger}`; }
+        bd.sira = 'oyuncu'; bd.mesaj = bMesaj;
+        // Kart dağıtımı
+        if (bd.oyuncuEl.length === 0 && bd.deste.length >= 8) {
+          bd.oyuncuEl = bd.deste.splice(0,4); bd.botEl = bd.deste.splice(0,4);
+        }
+        // Oyun sonu
+        if (bd.oyuncuEl.length === 0 && bd.botEl.length === 0 && bd.deste.length === 0) {
+          bd.bitti = true; bd.sira = 'oyuncu';
+          bd.mesaj = `🏁 Oyun bitti! Sen: ${bd.oyuncuSkor} | Bot: ${bd.botSkor}`;
+        }
+        return bd;
+      });
+    }, 900);
+  };
+
+  // --- TAVLA: Zar At ---
+  const tavlaZarAt = () => {
+    setTavlaDurum(prev => {
+      if (!prev || prev.sira !== 'oyuncu') return prev;
+      const z1=Math.floor(Math.random()*6)+1, z2=Math.floor(Math.random()*6)+1;
+      const haklar = z1===z2 ? [z1,z1,z1,z1] : [z1,z2];
+      return { ...prev, zar1:z1, zar2:z2, hamleHaklari:haklar, mesaj:`🎲 Zarlar: ${z1}-${z2}. Haneni seç.`, seciliHane:null };
+    });
+  };
+
+  // --- TAVLA: Hane Seç ve Hamle Yap ---
+  const tavlaHaneClick = (haneIdx: number) => {
+    setTavlaDurum(prev => {
+      if (!prev || prev.sira !== 'oyuncu' || prev.hamleHaklari.length === 0) return prev;
+      const d = { ...prev, tahta: prev.tahta.map(h=>({...h})) };
+      if (d.seciliHane === null) {
+        // Kaynak seç (sadece oyuncunun beyaz taşları)
+        const hane = d.tahta[haneIdx];
+        if (hane.renk === 'beyaz' && hane.sayi > 0) { return { ...d, seciliHane: haneIdx }; }
+        return d;
+      }
+      // Hedef seç → hamle yap
+      const zar = d.hamleHaklari[0];
+      const kaynak = d.tahta[d.seciliHane];
+      const hedefIdx = d.seciliHane + zar; // beyaz ileri gider
+      if (hedefIdx >= 24) {
+        // Eve taş toplama
+        kaynak.sayi--; if (kaynak.sayi===0) kaynak.renk=null;
+        d.oyuncuToplanan++;
+        d.hamleHaklari = d.hamleHaklari.slice(1);
+        d.mesaj = `✅ Taş eve toplandı! (${d.oyuncuToplanan}/15)`;
+        d.seciliHane = null;
+        if (d.oyuncuToplanan >= 15) { d.bitti = true; d.mesaj = '🏆 Tebrikler! Tavlayı kazandın!'; }
+        return d;
+      }
+      const hedef = d.tahta[hedefIdx];
+      if (hedef.renk === 'siyah' && hedef.sayi >= 2) {
+        return { ...d, mesaj:'❌ O hane kapalı! Başka yer seç.', seciliHane:null };
+      }
+      // Vurma
+      if (hedef.renk === 'siyah' && hedef.sayi === 1) {
+        hedef.renk = null; hedef.sayi = 0; d.botKirik++;
+        d.mesaj = `💥 Rakip taş kırıldı!`;
+      }
+      kaynak.sayi--; if (kaynak.sayi===0) kaynak.renk=null;
+      hedef.renk = 'beyaz'; hedef.sayi++;
+      d.hamleHaklari = d.hamleHaklari.slice(1);
+      d.mesaj = d.mesaj || `✅ Hamle yapıldı.`;
+      d.seciliHane = null;
+      // Bot sırası
+      if (d.hamleHaklari.length === 0) {
+        d.sira = 'bot';
+        d.mesaj = '🤖 Bot düşünüyor...';
+      }
+      return d;
+    });
+    // Eğer sıra bota geçtiyse bot hamlesi
+    setTimeout(() => {
+      setTavlaDurum(prev => {
+        if (!prev || prev.sira !== 'bot') return prev;
+        const bd = { ...prev, tahta: prev.tahta.map(h=>({...h})) };
+        const bz1=Math.floor(Math.random()*6)+1, bz2=Math.floor(Math.random()*6)+1;
+        const bHaklar = bz1===bz2 ? [bz1,bz1,bz1,bz1] : [bz1,bz2];
+        // Bot en basit hamleyi yapar (siyah taşı en ileri taşır)
+        for (const zar of bHaklar) {
+          const siyahlar = bd.tahta.filter(h => h.renk==='siyah' && h.sayi>0).sort((a,b)=>b.index-a.index);
+          for (const sh of siyahlar) {
+            const hIdx = sh.index - 1;
+            const hedefIdx = hIdx - zar;
+            if (hedefIdx < 0) { sh.sayi--; if(sh.sayi===0) sh.renk=null; bd.botToplanan++; break; }
+            const hedef = bd.tahta[hedefIdx];
+            if (hedef.renk==='beyaz' && hedef.sayi>=2) continue;
+            if (hedef.renk==='beyaz' && hedef.sayi===1) { hedef.renk=null; hedef.sayi=0; bd.oyuncuKirik++; }
+            sh.sayi--; if(sh.sayi===0) sh.renk=null;
+            hedef.renk='siyah'; hedef.sayi++; break;
+          }
+        }
+        bd.sira = 'oyuncu';
+        bd.zar1 = bz1; bd.zar2 = bz2;
+        bd.hamleHaklari = [bz1, bz2];
+        bd.mesaj = `🤖 Bot oynadı. Sıra sende! Yeni zarlar: ${bz1}-${bz2}`;
+        if (bd.botToplanan >= 15) { bd.bitti = true; bd.mesaj = '😞 Bot kazandı! Yeniden dene.'; }
+        return bd;
+      });
+    }, 1200);
+  };
+
+  // --- OKEY: Taş At ---
+  const okeyTasAt = (tasId: number) => {
+    setOkeyDurum(prev => {
+      if (!prev || prev.aktifOyuncu !== 0 || prev.bitti) return prev;
+      const d = { ...prev, oyuncular: prev.oyuncular.map(o => ({...o, el:[...o.el]})) };
+      const el = d.oyuncular[0].el;
+      const idx = el.findIndex(t => t.id === tasId);
+      if (idx === -1) return prev;
+      const [atilanTas] = el.splice(idx, 1);
+      d.atilanTas = atilanTas;
+      d.atilanTasGecmisi = [...(d.atilanTasGecmisi || []).slice(-5), { oyuncuIdx: 0, tas: atilanTas }];
+      d.aktifOyuncu = 1;
+      d.mesaj = `${atilanTas.okeyMi ? 'JOKER' : atilanTas.renk+' '+atilanTas.deger} attın. Bot sırası...`;
+      return d;
+    });
+    setOkeyTimerAktif(false);
+    setOkeyTimer(15);
+    // Bot turları — her bot 2 saniye bekler
+    const botOyna = (botIdx: number) => {
+      setTimeout(() => {
+        setOkeyDurum(prev => {
+          if (!prev || prev.bitti) return prev;
+          if (prev.kalanDeste.length === 0) return { ...prev, bitti: true, mesaj: '🏁 Deste bitti!' };
+          const d = { ...prev, oyuncular: prev.oyuncular.map(o => ({...o, el:[...o.el]})), kalanDeste: [...prev.kalanDeste] };
+          if (d.oyuncular[botIdx].el.length > 0) {
+            const cekilen = d.kalanDeste.shift()!;
+            d.oyuncular[botIdx].el.push(cekilen);
+            const elBot = d.oyuncular[botIdx].el;
+            const atIdx = elBot.findIndex(t => !t.okeyMi);
+            if (atIdx !== -1) {
+              const [botAtilanTas] = elBot.splice(atIdx, 1);
+              d.atilanTas = botAtilanTas;
+              d.atilanTasGecmisi = [...(d.atilanTasGecmisi || []).slice(-5), { oyuncuIdx: botIdx, tas: botAtilanTas }];
+            }
+          }
+          if (botIdx === 3) {
+            d.aktifOyuncu = 0;
+            d.mesaj = 'Sıra sende! Desteden çek veya yerdekini al.';
+          } else {
+            d.aktifOyuncu = botIdx + 1;
+          }
+          return d;
+        });
+        if (botIdx < 3) botOyna(botIdx + 1);
+        else { setOkeyTimer(15); setOkeyTimerAktif(true); }
+      }, 2000);
+    };
+    botOyna(1);
+  };
+
+  // --- OKEY: Desteden Taş Çek ---
+  const okeyTasCek = () => {
+    setOkeyDurum(prev => {
+      if (!prev || prev.aktifOyuncu !== 0 || prev.bitti || prev.kalanDeste.length === 0) return prev;
+      const d = { ...prev, kalanDeste: [...prev.kalanDeste], oyuncular: prev.oyuncular.map(o=>({...o,el:[...o.el]})) };
+      const [cekilen] = d.kalanDeste.splice(0, 1);
+      d.oyuncular[0].el.push(cekilen);
+      d.mesaj = `${cekilen.okeyMi ? '🎉 JOKER çektin!' : `${cekilen.renk} ${cekilen.deger} çektin.`} Şimdi bir taş at.`;
+      return d;
+    });
+  };
+
+  // --- OKEY: Yerdeki Taşı Al ---
+  const okeyYerdekiniAl = () => {
+    setOkeyDurum(prev => {
+      if (!prev || prev.aktifOyuncu !== 0 || !prev.atilanTas || prev.bitti) return prev;
+      const d = { ...prev, oyuncular: prev.oyuncular.map(o=>({...o,el:[...o.el]})) };
+      d.oyuncular[0].el.push(d.atilanTas);
+      d.atilanTas = null;
+      d.mesaj = 'Yerdeki taşı aldın. Şimdi bir taş at.';
+      return d;
+    });
+  };
+
   // OYUNCU EKONOMİSİ
   const [vipSeviyesi, setVipSeviyesi] = useState(0); 
   const [bakiyeCip, setBakiyeCip] = useState(34100);
@@ -576,15 +1097,15 @@ export default function LoungeApp() {
         {/* SAĞ: GRID MENÜ MASALARI (CAM EFEKTLİ LÜKS YAPI)          */}
         {/* ======================================================== */}
         <div className="w-[480px] grid grid-cols-3 gap-2.5 content-center z-10 h-full">
-          <button onClick={() => alert("🚀 101 Okey Otomatik Eşleşme masasına bağlanılıyor...")} className="col-span-3 bg-gradient-to-r from-orange-500/90 via-amber-500/90 to-yellow-500/90 backdrop-blur-sm p-4 rounded-xl flex justify-between items-center group border border-yellow-400/50 shadow-xl hover:brightness-110 transition-all">
+          <button onClick={() => masaAc("101 Okey")} className="col-span-3 bg-gradient-to-r from-orange-500/90 via-amber-500/90 to-yellow-500/90 backdrop-blur-sm p-4 rounded-xl flex justify-between items-center group border border-yellow-400/50 shadow-xl hover:brightness-110 transition-all">
             <div className="text-left"><span className="text-[10px] block font-black text-orange-950 uppercase tracking-widest">101 OKEY</span><h3 className="text-lg font-black text-white tracking-wide mt-0.5 drop-shadow-md">Otomatik Eşleşme</h3></div>
             <span className="text-4xl drop-shadow-lg">📿</span>
           </button>
-          <button onClick={() => alert("🚀 Pişti Salonu Açılıyor...")} className="bg-gradient-to-b from-blue-600/90 to-indigo-900/90 backdrop-blur-sm border border-blue-400/40 p-3 rounded-xl flex flex-col justify-between items-center text-center h-28 shadow-lg hover:brightness-105 active:scale-95 transition-all">
-            <span className="text-2xl block drop-shadow-md">🃏</span><span className="text-xs font-black uppercase tracking-wider block text-white drop-shadow-md">Pişti</span><span className="text-[8px] text-blue-100 uppercase tracking-widest block bg-blue-950/80 px-1.5 py-0.5 rounded shadow">Yarışma</span>
+          <button onClick={() => masaAc("Pişti")} className="bg-gradient-to-b from-blue-600/90 to-indigo-900/90 backdrop-blur-sm border border-blue-400/40 p-3 rounded-xl flex flex-col justify-between items-center text-center h-28 shadow-lg hover:brightness-105 active:scale-95 transition-all">
+            <span className="text-2xl block drop-shadow-md">🃏</span><span className="text-xs font-black uppercase tracking-wider block text-white drop-shadow-md">Pişti</span><span className="text-[8px] text-blue-100 uppercase tracking-widest block bg-blue-950/80 px-1.5 py-0.5 rounded shadow">Hızlı Oyna</span>
           </button>
-          <button onClick={() => alert("🚀 Tavla Salonu Açılıyor...")} className="bg-gradient-to-b from-emerald-600/90 to-teal-900/90 backdrop-blur-sm border border-emerald-400/40 p-3 rounded-xl flex flex-col justify-between items-center text-center h-28 shadow-lg hover:brightness-105 active:scale-95 transition-all">
-            <span className="text-2xl block drop-shadow-md">🎲</span><span className="text-xs font-black uppercase tracking-wider block text-white drop-shadow-md">Tavla</span><span className="text-[8px] text-emerald-100 uppercase tracking-widest block bg-emerald-950/80 px-1.5 py-0.5 rounded shadow">Masa Aç</span>
+          <button onClick={() => { setTavlaTakimSecimAcik(true); }} className="bg-gradient-to-b from-emerald-600/90 to-teal-900/90 backdrop-blur-sm border border-emerald-400/40 p-3 rounded-xl flex flex-col justify-between items-center text-center h-28 shadow-lg hover:brightness-105 active:scale-95 transition-all">
+            <span className="text-2xl block drop-shadow-md">🎲</span><span className="text-xs font-black uppercase tracking-wider block text-white drop-shadow-md">Tavla</span><span className="text-[8px] text-emerald-100 uppercase tracking-widest block bg-emerald-950/80 px-1.5 py-0.5 rounded shadow">Hızlı Oyna</span>
           </button>
           {/* LİGLER BUTONUNUN OLDUĞU YERİ ŞU ŞEKİLDE GÜNCELLE: */}
 <button 
@@ -948,6 +1469,1158 @@ export default function LoungeApp() {
         <div className="absolute top-16 right-4 w-52 bg-slate-900 border border-gray-800 rounded-xl p-3 shadow-2xl z-[70] text-xs animate-fade-in">
           <h3 className="font-bold border-b border-gray-800 pb-1.5 mb-2 text-gray-400">⚙️ AYARLAR PANELİ</h3>
           <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full bg-red-950/60 text-red-400 py-1.5 rounded border border-red-900/30 font-bold hover:bg-red-900/30">Oturumu Kapat (Çıkış)</button>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: OKEY MASA SEÇİM EKRANI (Acemiler / Ustalar vb.)   */}
+      {/* ======================================================== */}
+      {okeyAcik && !okeyDurum && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center overflow-hidden"
+          style={{background: 'radial-gradient(ellipse at center, #1a3a5c 0%, #0d1f35 100%)'}}>
+          {/* Arka plan ışık efekti */}
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-gradient-to-t from-yellow-300/20 to-transparent blur-[80px]"></div>
+
+          {/* Üst bar */}
+          <div className="absolute top-0 left-0 right-0 flex justify-between items-center px-6 py-3 bg-black/30">
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-400 font-black text-sm">🪙 {bakiyeCip.toLocaleString()}</span>
+            </div>
+            <h2 className="font-black text-white text-lg tracking-wider drop-shadow">101 OKEY — MASA SEÇ</h2>
+            <button onClick={() => setOkeyAcik(false)}
+              className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white">✕</button>
+          </div>
+
+          {/* Masa Kartları */}
+          <div className="flex items-end justify-center gap-6 mt-8 px-4">
+            {[
+              { ad: 'Acemiler',     renk: 'from-green-400 to-teal-500',    kenarlık: 'border-green-300', golge: 'shadow-[0_0_40px_rgba(52,211,153,0.5)]', oneri: true,  ucret: 20,    minGiris: 10000,   minYazi: '10K',  emoji: '🍵', yukseklik: 'h-[320px]' },
+              { ad: 'Tecrübeliler', renk: 'from-cyan-400 to-blue-500',     kenarlık: 'border-cyan-300',  golge: 'shadow-[0_0_40px_rgba(34,211,238,0.5)]', oneri: false, ucret: 100,   minGiris: 100000,  minYazi: '100K', emoji: '📿', yukseklik: 'h-[300px]' },
+              { ad: 'Ustalar',      renk: 'from-blue-500 to-indigo-600',   kenarlık: 'border-blue-300',  golge: 'shadow-[0_0_40px_rgba(99,102,241,0.5)]', oneri: false, ucret: 400,   minGiris: 240000,  minYazi: '240K', emoji: '🏆', yukseklik: 'h-[300px]' },
+              { ad: 'Yıldızlar',    renk: 'from-yellow-400 to-amber-600',  kenarlık: 'border-yellow-300',golge: 'shadow-[0_0_40px_rgba(251,191,36,0.6)]', oneri: false, ucret: 2000,  minGiris: 1000000, minYazi: '1M',   emoji: '👑', yukseklik: 'h-[300px]' },
+            ].map((masa) => {
+              const yeterli = bakiyeCip >= masa.minGiris;
+              return (
+                <button
+                  key={masa.ad}
+                  onClick={() => {
+                    if (!yeterli) { alert(`❌ Minimum ${masa.minYazi} çip gerekli!`); return; }
+                    setBakiyeCip(p => p - masa.ucret);
+                    setOkeyDurum(yeniOkeyOyunu(isim || 'Oyuncu'));
+                    setOkeyDizMod('serbest');
+                  }}
+                  className={`relative flex flex-col items-center justify-between ${masa.yukseklik} w-44 rounded-2xl bg-gradient-to-b ${masa.renk} border-4 ${masa.kenarlık} ${masa.golge} p-4 transition-all hover:scale-105 hover:-translate-y-2 active:scale-95 ${!yeterli ? 'opacity-60' : ''}`}
+                >
+                  {/* Önerilen etiketi */}
+                  {masa.oneri && (
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-500 text-white text-[10px] font-black px-3 py-0.5 rounded-full shadow-lg border border-orange-300">
+                      Önerilen
+                    </div>
+                  )}
+
+                  {/* Üst: Masa adı + ücret */}
+                  <div className="text-center">
+                    <h3 className="font-black text-white text-xl drop-shadow-lg">{masa.ad}</h3>
+                    <p className="text-white/80 text-xs font-bold mt-0.5">Ücret: {masa.ucret}</p>
+                  </div>
+
+                  {/* Orta: Emoji/görsel */}
+                  <div className="flex-1 flex items-center justify-center">
+                    <span className="text-6xl drop-shadow-[0_4px_15px_rgba(0,0,0,0.5)]">{masa.emoji}</span>
+                  </div>
+
+                  {/* Alt: Minimum giriş */}
+                  <div className="w-full">
+                    <p className="text-white/70 text-[10px] text-center font-bold mb-1">Minimum giriş ücreti:</p>
+                    <div className="bg-black/30 border border-white/30 rounded-xl py-1.5 flex items-center justify-center gap-1">
+                      <span className="text-yellow-400 text-sm">🪙</span>
+                      <span className="text-yellow-300 font-black text-sm">{masa.minYazi}</span>
+                    </div>
+                    {!yeterli && <p className="text-red-300 text-[9px] text-center mt-1 font-bold">Yetersiz çip</p>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Alt hint */}
+          <div className="absolute bottom-4 text-white/40 text-[10px] font-bold">
+            Bakiye: {bakiyeCip.toLocaleString()} 🪙 · Masa ücreti girişte düşülür
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: OKEY OYUN EKRANI (4 KİŞİLİK MASA)                 */}
+      {/* ======================================================== */}
+      {okeyAcik && okeyDurum && (() => {
+        const tema = ISTAKA_TEMALAR[kusanilanIstaka] || ISTAKA_TEMALAR[1];
+        const dizAnaliz = okeyDizMod === 'seri'
+          ? seriDiz(okeyDurum.oyuncular[0].el)
+          : okeyDizMod === 'cift'
+          ? ciftDiz(okeyDurum.oyuncular[0].el)
+          : null;
+        const dizPuan = dizAnaliz ? elPuanHesapla(dizAnaliz.gruplar, dizAnaliz.jokerler) : 0;
+
+        // Taş renk stilleri — resimdeki gibi: beyaz zemin, renk + sembol
+        const TAS_RENKLER: Record<string,{text:string; sembol: string}> = {
+          kirmizi: { text:'text-red-600',    sembol:'♥' },
+          siyah:   { text:'text-gray-900',   sembol:'♠' },
+          mavi:    { text:'text-blue-600',   sembol:'♦' },
+          sari:    { text:'text-yellow-500', sembol:'♣' },
+          joker:   { text:'text-purple-600', sembol:'★' },
+        };
+
+        // Taş bileşeni — resimdeki gibi beyaz kart, üstte sayı, ortada sembol
+        const Tas = ({ tas, onClick, disabled, secili, grupta }: {
+          tas: {id:number;renk:string;deger:number;okeyMi:boolean};
+          onClick?: ()=>void;
+          disabled?: boolean;
+          secili?: boolean;
+          grupta?: boolean;
+        }) => {
+          const r = TAS_RENKLER[tas.renk] || TAS_RENKLER['siyah'];
+          const borderRenk: Record<string,string> = { kirmizi:'border-red-300', siyah:'border-gray-400', mavi:'border-blue-300', sari:'border-yellow-300', joker:'border-purple-300' };
+          return (
+            <button onClick={onClick} disabled={disabled}
+              className={`relative w-[38px] h-[54px] rounded-md bg-white flex flex-col items-center justify-between py-0.5 shadow-md transition-all select-none border-2
+                ${borderRenk[tas.renk] || 'border-gray-300'}
+                ${secili ? '-translate-y-4 shadow-[0_8px_20px_rgba(250,204,21,0.6)] ring-2 ring-yellow-400' : ''}
+                ${grupta ? 'ring-1 ring-green-400 shadow-[0_0_6px_rgba(34,197,94,0.5)]' : ''}
+                ${!disabled && !secili ? 'hover:-translate-y-3 hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)] cursor-pointer active:scale-95' : ''}
+                ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+              {/* Üst: sayı */}
+              <span className={`text-[11px] font-black leading-none ${r.text} w-full text-left pl-0.5`}>
+                {tas.okeyMi ? '★' : tas.deger}
+              </span>
+              {/* Orta: sembol */}
+              <span className={`text-base font-black leading-none ${r.text}`}>
+                {r.sembol}
+              </span>
+              {/* Alt: sayı ters */}
+              <span className={`text-[11px] font-black leading-none ${r.text} w-full text-right pr-0.5 rotate-180`}>
+                {tas.okeyMi ? '★' : tas.deger}
+              </span>
+            </button>
+          );
+        };
+
+        // Kapalı taş (bot için)
+        const KapaliTas = ({ dikey }: { dikey?: boolean }) => (
+          <div className={`${dikey ? 'w-[38px] h-[54px]' : 'w-[54px] h-[38px]'} rounded-md border-2 ${tema.kenarlık} shadow-sm flex items-center justify-center overflow-hidden`}
+            style={{background: `linear-gradient(135deg, var(--tw-gradient-stops))`, backgroundImage: `linear-gradient(135deg, #7c5a2e, #4a3018)`}}>
+            <div className="w-full h-full opacity-40" style={{backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 2px, transparent 2px, transparent 8px)'}}></div>
+          </div>
+        );
+
+        const grupIdSet = new Set<number>();
+        if (dizAnaliz) dizAnaliz.gruplar.forEach(g => g.forEach(t => grupIdSet.add(t.id)));
+
+        // Eli 2 satıra böl (max 14 per satır)
+        const el = okeyDurum.oyuncular[0].el;
+        const satir1 = el.slice(0, Math.ceil(el.length / 2));
+        const satir2 = el.slice(Math.ceil(el.length / 2));
+
+        return (
+          <div className="absolute inset-0 z-[100] overflow-hidden flex flex-col"
+            style={{background: 'linear-gradient(180deg, #1a2a4a 0%, #0f1e3a 100%)'}}>
+
+            {/* ÜST PANEL */}
+            <div className="flex justify-between items-center px-4 py-2 flex-shrink-0" style={{background: 'rgba(0,0,0,0.4)'}}>
+              {/* Sol oyuncu (Bot 1) */}
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-indigo-800 border-2 border-purple-400 flex items-center justify-center text-lg font-black text-white shadow-lg">
+                    {okeyDurum.oyuncular[1].isim[0]}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 bg-amber-500 text-black text-[8px] font-black px-1 rounded shadow">25</div>
+                </div>
+                <div>
+                  <div className="font-black text-white text-xs">{okeyDurum.oyuncular[1].isim}</div>
+                  <div className="text-yellow-400 text-[10px] font-bold">🪙 27.0K</div>
+                </div>
+                <div className="bg-black/40 border border-white/20 rounded-lg px-2 py-0.5 text-white text-xs font-black">{okeyDurum.oyuncular[1].el.length}</div>
+              </div>
+
+              {/* Orta: Karşı oyuncu (Bot 2) */}
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center gap-2 bg-black/50 border border-white/10 rounded-xl px-3 py-1">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-cyan-700 border-2 border-teal-300 flex items-center justify-center text-base font-black text-white shadow">
+                    {okeyDurum.oyuncular[2].isim[0]}
+                  </div>
+                  <div>
+                    <div className="font-black text-white text-xs">{okeyDurum.oyuncular[2].isim}</div>
+                    <div className="text-yellow-400 text-[10px] font-bold">🪙 28.1K</div>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <div className="bg-black/40 border border-white/20 rounded px-2 py-0.5 text-white text-[10px] font-bold">{okeyDurum.oyuncular[2].el.length} taş</div>
+                  <div className="bg-black/40 border border-white/20 rounded px-2 py-0.5 text-green-400 text-[10px] font-bold">🕐 {okeyDurum.aktifOyuncu === 0 ? '--' : '20s'}</div>
+                </div>
+              </div>
+
+              {/* Sağ: Bot 3 + Gösterge + çıkış */}
+              <div className="flex items-center gap-3">
+                {/* Gösterge taşı */}
+                {okeyDurum.gosterge && (() => {
+                  const g = okeyDurum.gosterge!;
+                  const r = TAS_RENKLER[g.renk] || TAS_RENKLER['siyah'];
+                  return (
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="text-[8px] text-gray-400 font-bold">GÖSTERGE</span>
+                      <div className={`w-8 h-11 rounded-md bg-white border-2 flex flex-col items-center justify-between py-0.5 shadow-md ${r.text === 'text-red-600' ? 'border-red-300' : r.text === 'text-blue-600' ? 'border-blue-300' : r.text === 'text-yellow-500' ? 'border-yellow-300' : 'border-gray-400'}`}>
+                        <span className={`text-[9px] font-black leading-none ${r.text} w-full text-left pl-0.5`}>{g.deger}</span>
+                        <span className={`text-sm font-black ${r.text}`}>{r.sembol}</span>
+                        <span className={`text-[9px] font-black leading-none ${r.text} rotate-180`}>{g.deger}</span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-yellow-500/20 border border-yellow-400/40 rounded px-1.5 py-0.5">
+                        <span className="text-[8px] text-yellow-300 font-bold">OKEY: {okeyDurum.okeyDeger}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-600 to-red-800 border-2 border-orange-400 flex items-center justify-center text-lg font-black text-white shadow-lg">
+                      {okeyDurum.oyuncular[3].isim[0]}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 bg-amber-500 text-black text-[8px] font-black px-1 rounded shadow">21</div>
+                  </div>
+                  <div>
+                    <div className="font-black text-white text-xs">{okeyDurum.oyuncular[3].isim}</div>
+                    <div className="text-yellow-400 text-[10px] font-bold">🪙 62.9K</div>
+                  </div>
+                </div>
+                <button onClick={() => { setOkeyAcik(false); setOkeyDurum(null); setOkeyDizMod('serbest'); }}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white text-xs ml-2">✕</button>
+              </div>
+            </div>
+
+            {/* MASA ALANI */}
+            <div className="flex-1 relative overflow-hidden mx-3 my-1 rounded-2xl"
+              style={{background: 'linear-gradient(180deg, #2563a8 0%, #1d4ed8 40%, #1e3a8a 100%)', boxShadow: 'inset 0 0 60px rgba(0,0,0,0.4)'}}>
+
+              {/* Masa logosu */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10 select-none pointer-events-none">
+                <span className="text-white font-black text-6xl tracking-widest">101 OKEY</span>
+              </div>
+
+              {/* Sol duvar — Bot 1 kapalı taşları */}
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col gap-0.5">
+                {Array.from({length: Math.min(okeyDurum.oyuncular[1].el.length, 10)}).map((_, i) => (
+                  <KapaliTas key={i} />
+                ))}
+              </div>
+
+              {/* Sağ duvar — Bot 3 kapalı taşları */}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-0.5">
+                {Array.from({length: Math.min(okeyDurum.oyuncular[3].el.length, 10)}).map((_, i) => (
+                  <KapaliTas key={i} />
+                ))}
+              </div>
+
+              {/* Üst — Bot 2 kapalı taşları */}
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-0.5">
+                {Array.from({length: Math.min(okeyDurum.oyuncular[2].el.length, 14)}).map((_, i) => (
+                  <KapaliTas key={i} dikey />
+                ))}
+              </div>
+
+              {/* ORTA: Deste + Yerdeki + sayaç */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-8">
+                {/* Deste */}
+                <div className="flex flex-col items-center gap-1">
+                  <button onClick={okeyTasCek}
+                    disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti || okeyDurum.kalanDeste.length === 0}
+                    className={`relative group transition-all ${okeyDurum.aktifOyuncu === 0 && !okeyDurum.bitti ? 'cursor-pointer hover:scale-110' : 'opacity-60 cursor-not-allowed'}`}>
+                    <div className="absolute -top-1 -left-1 w-10 h-14 rounded-lg border-2 border-amber-700" style={{background: 'linear-gradient(135deg, #7c5a2e, #4a3018)'}}></div>
+                    <div className="absolute top-0 left-0 w-10 h-14 rounded-lg border-2 border-amber-600" style={{background: 'linear-gradient(135deg, #8c6a3e, #5a4028)'}}></div>
+                    <div className="relative w-10 h-14 rounded-lg border-2 border-amber-500 flex items-center justify-center shadow-xl" style={{background: 'linear-gradient(135deg, #9c7a4e, #6a5038)'}}>
+                      <span className="text-amber-200 text-lg group-hover:scale-110 transition-all">📿</span>
+                    </div>
+                  </button>
+                  <div className="bg-black/60 border border-white/20 rounded-lg px-2 py-0.5">
+                    <span className="text-white font-black text-xs">{okeyDurum.kalanDeste.length}</span>
+                  </div>
+                </div>
+
+                {/* Yerdeki taş */}
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-12 h-16 rounded-xl border-2 border-dashed border-white/30 bg-blue-900/40 flex items-center justify-center">
+                    {okeyDurum.atilanTas ? (
+                      <button onClick={okeyYerdekiniAl}
+                        disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti}
+                        className={`transition-all ${okeyDurum.aktifOyuncu === 0 ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed opacity-60'}`}>
+                        <Tas tas={okeyDurum.atilanTas} disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti} />
+                      </button>
+                    ) : (
+                      <span className="text-white/30 text-[9px] font-bold text-center">YER<br/>BOŞ</span>
+                    )}
+                  </div>
+                  <span className="text-white/50 text-[8px] font-bold">AL</span>
+                </div>
+              </div>
+
+              {/* Mesaj bandı (ortada küçük) */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 mt-20 bg-black/60 border border-white/10 rounded-full px-4 py-1">
+                <span className={`text-xs font-bold ${okeyDurum.aktifOyuncu === 0 ? 'text-green-400' : 'text-orange-400'}`}>
+                  {okeyDurum.aktifOyuncu === 0 ? '🟢 Sıra sende' : `🔴 ${okeyDurum.oyuncular[okeyDurum.aktifOyuncu]?.isim} oynuyor`}
+                </span>
+              </div>
+            </div>
+
+            {/* ALT PANEL: Istaka + Oyuncu eli + Kontroller */}
+            <div className="flex-shrink-0" style={{background: 'linear-gradient(180deg, #2d1a0a 0%, #1a0f05 100%)', borderTop: '3px solid #8B4513'}}>
+
+              {/* Istaka + el bilgisi satırı */}
+              <div className="flex justify-between items-center px-4 py-1.5 border-b border-amber-900/50">
+                {/* Sol: Oyuncu profili + istaka */}
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 to-orange-800 border-3 border-amber-400 flex items-center justify-center text-xl font-black text-white shadow-lg border-2">
+                      {isim[0]?.toUpperCase()}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 bg-amber-500 text-black text-[8px] font-black px-1 rounded border border-black">V{vipSeviyesi}</div>
+                  </div>
+                  <div>
+                    <div className="font-black text-white text-xs">{isim}</div>
+                    <div className="text-yellow-400 text-[10px] font-bold">🪙 {bakiyeCip.toLocaleString()}</div>
+                  </div>
+                  {/* Istaka — Gerçek okey ıstakası: yatay tahta, üzerinde dikey çubuklar, taşlar çubuklarda */}
+                  <div className="flex flex-col items-end ml-3 relative">
+                    {/* Taşlı çubuklar + tahta */}
+                    <div className="relative flex flex-col items-center">
+
+                      {/* ÇUBUKLAR + Üzerindeki taşlar (4 çubuk yan yana) */}
+                      <div className="flex items-end gap-[3px] mb-0">
+                        {[6, 8, 5, 7].map((tasSayisi, ci) => (
+                          <div key={ci} className="flex flex-col items-center" style={{gap: 0}}>
+                            {/* Çubuk üst topi */}
+                            <div style={{
+                              width: '5px', height: '5px',
+                              borderRadius: '50%',
+                              background: 'radial-gradient(circle at 35% 30%, #e8c870, #a07820 60%, #604a10)',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.7)',
+                              marginBottom: '-1px',
+                              zIndex: 10,
+                              position: 'relative'
+                            }}></div>
+
+                            {/* Taşlar (üstten aşağı dizilmiş) */}
+                            <div className="flex flex-col items-center" style={{gap: '1px', zIndex: 5, position: 'relative'}}>
+                              {Array.from({length: tasSayisi}).map((_, ti) => {
+                                // Taş renkleri: kırmızı, sarı, mavi, siyah sırayla
+                                const tasRenkleri = [
+                                  {bg: 'linear-gradient(180deg, #fff 60%, #f0f0f0)', brd: '#e53e3e', num: '#e53e3e'},
+                                  {bg: 'linear-gradient(180deg, #fff 60%, #f0f0f0)', brd: '#d4a017', num: '#c8860a'},
+                                  {bg: 'linear-gradient(180deg, #fff 60%, #f0f0f0)', brd: '#3182ce', num: '#2563eb'},
+                                  {bg: 'linear-gradient(180deg, #fff 60%, #f0f0f0)', brd: '#1a1a1a', num: '#222'},
+                                ];
+                                const tr = tasRenkleri[ti % 4];
+                                return (
+                                  <div key={ti} style={{
+                                    width: '14px', height: '18px',
+                                    background: tr.bg,
+                                    border: `1.5px solid ${tr.brd}`,
+                                    borderRadius: '2px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                                    position: 'relative',
+                                  }}>
+                                    <span style={{fontSize: '7px', fontWeight: 900, color: tr.num, lineHeight: 1}}>
+                                      {ti + 1 + ci * 3}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Çubuk alt kısmı (tahtaya giren kısım) */}
+                            <div style={{
+                              width: '4px', height: '8px',
+                              background: 'linear-gradient(90deg, #8B5E1A, #D4A04A 40%, #D4A04A 60%, #8B5E1A)',
+                              borderRadius: '0 0 2px 2px',
+                              boxShadow: '1px 0 2px rgba(0,0,0,0.4)',
+                            }}></div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* ANA TAHTA (yatay, ahşap) */}
+                      <div style={{
+                        width: '66px', height: '11px',
+                        background: 'linear-gradient(180deg, #c8893a 0%, #a06828 40%, #7a4e1e 100%)',
+                        borderRadius: '3px 3px 2px 2px',
+                        boxShadow: '0 3px 8px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2)',
+                        position: 'relative',
+                        zIndex: 10,
+                      }}>
+                        {/* Tahta çizgisi */}
+                        <div style={{position:'absolute', left:'6px', right:'6px', top:'4px', height:'1px', background:'rgba(255,255,255,0.15)', borderRadius:'1px'}}></div>
+                      </div>
+                      {/* Alt kaide */}
+                      <div style={{
+                        width: '72px', height: '7px',
+                        background: 'linear-gradient(180deg, #6B3A14 0%, #3a1e08 100%)',
+                        borderRadius: '2px',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.7)',
+                      }}></div>
+
+                      {/* Zemin gölgesi */}
+                      <div style={{width:'60px', height:'4px', background:'radial-gradient(ellipse, rgba(0,0,0,0.5) 0%, transparent 70%)', borderRadius:'50%', marginTop:'1px'}}></div>
+                    </div>
+
+                    {/* Tema adı */}
+                    <span className="text-[7px] text-amber-400/60 font-bold whitespace-nowrap text-center" style={{width:'72px'}}>{tema.isim}</span>
+                  </div>
+                </div>
+
+                {/* Orta: El bilgisi */}
+                <div className="flex items-center gap-4 text-xs text-white/60 font-bold">
+                  <div className="flex items-center gap-1">
+                    <span>🃏</span><span>{el.length} taş</span>
+                  </div>
+                  {dizAnaliz && (
+                    <>
+                      <div className="text-green-400">{dizAnaliz.gruplar.length} per</div>
+                      <div className="text-yellow-400">{dizPuan} puan</div>
+                      <div className="text-red-400">{dizAnaliz.tekler.length} tek</div>
+                    </>
+                  )}
+                </div>
+
+                {/* Sağ: Oyun sonu */}
+                <div className="flex gap-2">
+                  {okeyDurum.bitti && (
+                    <button onClick={() => { setOkeyDurum(yeniOkeyOyunu(isim || 'Oyuncu')); setOkeyDizMod('serbest'); }}
+                      className="bg-gradient-to-r from-orange-500 to-amber-500 text-black font-black px-4 py-1.5 rounded-lg text-xs hover:brightness-110">
+                      🔄 Yeni Oyun
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* EL — Taşlar */}
+              <div className="px-4 py-2">
+                {dizAnaliz ? (
+                  /* Seri/Çift mod: gruplu görünüm */
+                  <div className="flex gap-2 flex-wrap justify-start items-end min-h-[60px]">
+                    {dizAnaliz.gruplar.map((grup, gi) => (
+                      <div key={gi} className="flex gap-0.5 bg-green-900/50 border border-green-600/60 rounded-lg p-1 shadow-inner">
+                        {grup.map(tas => (
+                          <Tas key={tas.id} tas={tas} grupta
+                            disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti}
+                            onClick={() => okeyTasAt(tas.id)} />
+                        ))}
+                      </div>
+                    ))}
+                    {dizAnaliz.jokerler.map(tas => (
+                      <div key={tas.id} className="bg-purple-900/50 border border-purple-500/60 rounded-lg p-1">
+                        <Tas tas={tas}
+                          disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti}
+                          onClick={() => okeyTasAt(tas.id)} />
+                      </div>
+                    ))}
+                    {dizAnaliz.tekler.length > 0 && (
+                      <div className="flex gap-0.5 bg-red-950/50 border border-red-800/50 rounded-lg p-1">
+                        {dizAnaliz.tekler.map(tas => (
+                          <Tas key={tas.id} tas={tas}
+                            disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti}
+                            onClick={() => okeyTasAt(tas.id)} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Serbest mod: 2 satır */
+                  <div className="flex flex-col gap-1">
+                    <div className="flex gap-0.5 items-end">
+                      {satir1.map(tas => (
+                        <Tas key={tas.id} tas={tas}
+                          disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti}
+                          onClick={() => okeyTasAt(tas.id)} />
+                      ))}
+                    </div>
+                    {satir2.length > 0 && (
+                      <div className="flex gap-0.5 items-end">
+                        {satir2.map(tas => (
+                          <Tas key={tas.id} tas={tas}
+                            disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti}
+                            onClick={() => okeyTasAt(tas.id)} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Seri Diz / Çift Diz butonları — resimdeki gibi sağ köşe altın kartlar */}
+              <div className="absolute bottom-3 right-3 flex flex-col gap-2" style={{zIndex:20}}>
+                {/* SERİ DİZ */}
+                <button
+                  onClick={() => setOkeyDizMod(prev => prev === 'seri' ? 'serbest' : 'seri')}
+                  className="relative overflow-hidden transition-all active:scale-95"
+                  style={{
+                    width: '80px', height: '62px',
+                    borderRadius: '10px',
+                    background: okeyDizMod === 'seri'
+                      ? 'linear-gradient(160deg, #ff9f2f 0%, #e07010 40%, #b85008 100%)'
+                      : 'linear-gradient(160deg, #c87820 0%, #a05a10 40%, #7a3e08 100%)',
+                    border: okeyDizMod === 'seri' ? '2px solid #ffcc60' : '2px solid #c8820a',
+                    boxShadow: okeyDizMod === 'seri'
+                      ? '0 0 16px rgba(255,160,48,0.7), 0 4px 8px rgba(0,0,0,0.5)'
+                      : '0 4px 8px rgba(0,0,0,0.5)',
+                  }}>
+                  {/* İç parlaklık */}
+                  <div style={{position:'absolute', top:0, left:0, right:0, height:'40%', background:'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%)', borderRadius:'8px 8px 0 0'}}></div>
+                  {/* Mini taş sayıları */}
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', marginTop:'6px'}}>
+                    {['1','2','3'].map((n, i) => (
+                      <div key={i} style={{
+                        width:'16px', height:'20px',
+                        background: 'linear-gradient(180deg, #fff 60%, #f0ecdc)',
+                        border: '1.5px solid #d4a030',
+                        borderRadius: '3px',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        boxShadow:'0 1px 3px rgba(0,0,0,0.4)',
+                        color: i===0?'#e53e3e':i===1?'#2563eb':'#1a1a1a',
+                        fontSize: '9px',
+                        fontWeight: 900,
+                      }}>{n}</div>
+                    ))}
+                  </div>
+                  {/* Yazı */}
+                  <div style={{
+                    color: '#fff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    textAlign: 'center',
+                    marginTop: '4px',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                    letterSpacing: '0.5px',
+                  }}>Seri Diz</div>
+                </button>
+
+                {/* ÇİFT DİZ */}
+                <button
+                  onClick={() => setOkeyDizMod(prev => prev === 'cift' ? 'serbest' : 'cift')}
+                  className="relative overflow-hidden transition-all active:scale-95"
+                  style={{
+                    width: '80px', height: '62px',
+                    borderRadius: '10px',
+                    background: okeyDizMod === 'cift'
+                      ? 'linear-gradient(160deg, #d4a030 0%, #a87820 40%, #7a5210 100%)'
+                      : 'linear-gradient(160deg, #8a6010 0%, #6a4808 40%, #4a3005 100%)',
+                    border: okeyDizMod === 'cift' ? '2px solid #f0c040' : '2px solid #9a7018',
+                    boxShadow: okeyDizMod === 'cift'
+                      ? '0 0 16px rgba(212,160,48,0.7), 0 4px 8px rgba(0,0,0,0.5)'
+                      : '0 4px 8px rgba(0,0,0,0.5)',
+                  }}>
+                  <div style={{position:'absolute', top:0, left:0, right:0, height:'40%', background:'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%)', borderRadius:'8px 8px 0 0'}}></div>
+                  {/* Mini taş sayıları — çift: 5-5-5 */}
+                  <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', marginTop:'6px'}}>
+                    {['5','5','5'].map((n, i) => (
+                      <div key={i} style={{
+                        width:'16px', height:'20px',
+                        background: 'linear-gradient(180deg, #fff 60%, #f0ecdc)',
+                        border: '1.5px solid #b08020',
+                        borderRadius: '3px',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        boxShadow:'0 1px 3px rgba(0,0,0,0.4)',
+                        color: i===0?'#e53e3e':i===1?'#2563eb':'#1a1a1a',
+                        fontSize: '9px',
+                        fontWeight: 900,
+                      }}>{n}</div>
+                    ))}
+                  </div>
+                  <div style={{
+                    color: '#fff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    textAlign: 'center',
+                    marginTop: '4px',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                    letterSpacing: '0.5px',
+                  }}>Çift Diz</div>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ======================================================== */}
+      {/* MODAL: PİŞTİ OYUN EKRANI                                  */}
+      {/* ======================================================== */}
+      {pistiAcik && pistiDurum && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl">
+          <div className="w-[820px] bg-gradient-to-b from-slate-900 to-slate-950 border border-blue-500/30 rounded-3xl shadow-[0_0_80px_rgba(59,130,246,0.3)] overflow-hidden flex flex-col">
+
+            {/* Başlık Bar */}
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-3 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🃏</span>
+                <div>
+                  <h2 className="font-black text-lg text-white">Pişti — Hızlı Eşleşme</h2>
+                  <p className="text-blue-200 text-[10px]">vs Bot Rakip · Anlık</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-center bg-black/30 px-4 py-1.5 rounded-xl border border-white/10">
+                  <div className="text-[9px] text-blue-300 font-bold">SEN</div>
+                  <div className="font-black text-yellow-400 text-sm">{pistiDurum.oyuncuSkor} puan</div>
+                </div>
+                <div className="text-white font-black text-lg">vs</div>
+                <div className="text-center bg-black/30 px-4 py-1.5 rounded-xl border border-white/10">
+                  <div className="text-[9px] text-blue-300 font-bold">BOT</div>
+                  <div className="font-black text-red-400 text-sm">{pistiDurum.botSkor} puan</div>
+                </div>
+                <button
+                  onClick={() => { setPistiAcik(false); setPistiDurum(null); }}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white ml-2"
+                >✕</button>
+              </div>
+            </div>
+
+            {/* Masa Alanı */}
+            <div className="flex-1 flex flex-col items-center px-6 py-4 gap-4">
+
+              {/* Bot Eli (ters) */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-500 font-bold mr-1">🤖 BOT</span>
+                {pistiDurum.botEl.map((_, i) => (
+                  <div key={i} className="w-10 h-14 rounded-lg bg-gradient-to-br from-blue-900 to-indigo-900 border-2 border-blue-500/40 shadow-md flex items-center justify-center">
+                    <span className="text-blue-400 text-lg">🂠</span>
+                  </div>
+                ))}
+                <span className="text-[10px] text-gray-500 ml-2">{pistiDurum.botToplanan} kart</span>
+              </div>
+
+              {/* Yerdeki Kartlar + Deste */}
+              <div className="flex-1 flex items-center justify-center gap-6 w-full">
+                {/* Deste */}
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-12 h-16 rounded-lg bg-gradient-to-br from-indigo-900 to-blue-950 border-2 border-indigo-500/50 shadow-lg flex items-center justify-center relative">
+                    <span className="text-indigo-400 text-xl">🂠</span>
+                    <span className="absolute -bottom-5 text-[9px] text-gray-500 font-bold">{pistiDurum.deste.length} kart</span>
+                  </div>
+                </div>
+
+                {/* Yer */}
+                <div className="relative w-40 h-20 flex items-center justify-center">
+                  <div className="absolute inset-0 rounded-2xl border-2 border-dashed border-white/10 bg-white/5"></div>
+                  {pistiDurum.yer.length === 0 ? (
+                    <span className="text-gray-600 text-xs font-bold">YER BOŞ</span>
+                  ) : (
+                    <div className="flex -space-x-3">
+                      {pistiDurum.yer.slice(-3).map((k, i) => {
+                        const s = kartSeriSembol(k.seri);
+                        return (
+                          <div key={k.id} className="w-11 h-16 rounded-lg bg-white border-2 border-gray-200 shadow-xl flex flex-col justify-between p-1 relative"
+                            style={{zIndex: i, transform: `rotate(${(i-1)*5}deg)`}}>
+                            <span className={`text-xs font-black ${s.c}`}>{k.deger}{s.s}</span>
+                            <span className={`text-xl self-center ${s.c}`}>{s.s}</span>
+                            <span className={`text-xs font-black self-end rotate-180 ${s.c}`}>{k.deger}{s.s}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Mesaj */}
+                <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 max-w-[180px] text-center">
+                  <p className="text-white text-sm font-bold leading-tight">{pistiDurum.mesaj}</p>
+                  <p className="text-gray-500 text-[9px] mt-1">{pistiDurum.sira === 'oyuncu' ? '🟢 Sıra sende' : '🔴 Bot oynuyor...'}</p>
+                </div>
+              </div>
+
+              {/* Oyuncu Eli */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-2">
+                  {pistiDurum.oyuncuEl.map((k) => {
+                    const s = kartSeriSembol(k.seri);
+                    return (
+                      <button
+                        key={k.id}
+                        onClick={() => pistiKartAt(k.id)}
+                        disabled={pistiDurum.sira !== 'oyuncu' || pistiDurum.bitti}
+                        className={`w-14 h-20 rounded-xl bg-white border-2 shadow-xl flex flex-col justify-between p-1.5 transition-all
+                          ${pistiDurum.sira === 'oyuncu' && !pistiDurum.bitti
+                            ? 'border-blue-400 hover:-translate-y-3 hover:shadow-[0_8px_25px_rgba(59,130,246,0.5)] cursor-pointer active:scale-95'
+                            : 'border-gray-300 opacity-60 cursor-not-allowed'}`}
+                      >
+                        <span className={`text-sm font-black ${s.c}`}>{k.deger}{s.s}</span>
+                        <span className={`text-2xl self-center ${s.c}`}>{s.s}</span>
+                        <span className={`text-sm font-black self-end rotate-180 ${s.c}`}>{k.deger}{s.s}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-4 text-[10px] text-gray-500">
+                  <span>👤 {isim} · {pistiDurum.oyuncuToplanan} kart toplandı</span>
+                  {pistiDurum.bitti && (
+                    <button onClick={() => setPistiDurum(yeniPistiOyunu())}
+                      className="bg-blue-600 text-white px-3 py-1 rounded-lg font-bold text-xs hover:bg-blue-500">
+                      🔄 Yeniden Oyna
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: TAVLA TAKİM SEÇİM EKRANI                           */}
+      {/* ======================================================== */}
+      {tavlaTakimSecimAcik && (
+        <div className="absolute inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-lg">
+          <div className="w-[500px] bg-gradient-to-b from-slate-900 to-slate-950 border border-emerald-500/30 rounded-3xl overflow-hidden shadow-[0_0_60px_rgba(16,185,129,0.2)]">
+            <div className="bg-gradient-to-r from-emerald-700 to-teal-700 px-6 py-4 flex justify-between items-center">
+              <div>
+                <h2 className="font-black text-xl text-white">🎲 Takım Seç</h2>
+                <p className="text-emerald-200 text-[11px]">Tavla pullarının rengi seçtiğin takıma göre değişir</p>
+              </div>
+              <button onClick={() => setTavlaTakimSecimAcik(false)} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white">✕</button>
+            </div>
+            <div className="p-5 grid grid-cols-2 gap-3">
+              {FUTBOL_TAKIMLARI.map((t) => {
+                const sahip = sahipOlunanTakimlar.includes(t.id);
+                const secili = seciliTakim.id === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      if (!sahip) {
+                        if (bakiyeCip >= t.fiyat) {
+                          setBakiyeCip(p => p - t.fiyat);
+                          setSahipOlunanTakimlar(p => [...p, t.id]);
+                          setSeciliTakim(t);
+                          alert(`✅ ${t.ad} takımı satın alındı ve seçildi!`);
+                        } else {
+                          alert(`❌ Yetersiz çip! Gerekli: ${t.fiyat.toLocaleString()} 🪙`);
+                        }
+                      } else {
+                        setSeciliTakim(t);
+                      }
+                    }}
+                    className={`relative rounded-2xl p-4 flex items-center gap-3 transition-all border-2
+                      ${secili ? 'border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.4)]' : 'border-white/10 hover:border-white/30'}`}
+                    style={{ background: `linear-gradient(135deg, ${t.renkA}33, ${t.renkB}22)` }}
+                  >
+                    {secili && <span className="absolute top-2 right-2 text-yellow-400 text-xs font-black">✓ SEÇİLİ</span>}
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl border-2 flex-shrink-0"
+                      style={{ borderColor: t.renkA, background: `linear-gradient(135deg, ${t.renkA}, ${t.renkB})` }}>
+                      {t.emoji}
+                    </div>
+                    <div className="text-left">
+                      <div className="font-black text-white text-sm">{t.ad}</div>
+                      {sahip
+                        ? <div className="text-[10px] text-green-400 font-bold">✓ Sahipsiniz</div>
+                        : <div className="text-[10px] text-yellow-400 font-bold">{t.fiyat.toLocaleString()} 🪙</div>
+                      }
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="px-5 pb-5">
+              <button
+                onClick={() => {
+                  setTavlaTakimSecimAcik(false);
+                  setTavlaDurum(yeniTavlaOyunu());
+                  setTavlaAcik(true);
+                }}
+                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3 rounded-xl hover:brightness-110 transition-all"
+              >
+                🎲 {seciliTakim.emoji} {seciliTakim.ad} ile Oyna!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: TAVLA OYUN EKRANI                                   */}
+      {/* ======================================================== */}
+      {tavlaAcik && tavlaDurum && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl">
+          <div className="w-[900px] bg-gradient-to-b from-slate-900 to-slate-950 border border-emerald-500/30 rounded-3xl shadow-[0_0_80px_rgba(16,185,129,0.2)] overflow-hidden flex flex-col">
+
+            {/* Başlık Bar */}
+            <div className="bg-gradient-to-r from-emerald-700 to-teal-700 px-6 py-3 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">🎲</span>
+                <div>
+                  <h2 className="font-black text-lg text-white flex items-center gap-2">
+                    Tavla — Hızlı Eşleşme
+                    <span className="text-lg">{seciliTakim.emoji}</span>
+                    <span className="text-sm font-bold text-emerald-200">{seciliTakim.ad}</span>
+                  </h2>
+                  <p className="text-emerald-200 text-[10px]">vs Bot Rakip · Beyaz = Sen · Siyah = Bot</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setTavlaTakimSecimAcik(true)}
+                  className="bg-black/30 border border-white/20 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg hover:bg-black/50"
+                >
+                  🔄 Takım Değiştir
+                </button>
+                <div className="text-center bg-black/30 px-3 py-1 rounded-xl border border-white/10 text-xs">
+                  <span className="text-gray-400">Kırık: </span>
+                  <span className="text-red-400 font-bold">Sen {tavlaDurum.oyuncuKirik}</span>
+                  <span className="text-gray-600 mx-1">·</span>
+                  <span className="text-orange-400 font-bold">Bot {tavlaDurum.botKirik}</span>
+                </div>
+                <div className="text-center bg-black/30 px-3 py-1 rounded-xl border border-white/10 text-xs">
+                  <span className="text-gray-400">Eve: </span>
+                  <span className="text-green-400 font-bold">Sen {tavlaDurum.oyuncuToplanan}</span>
+                  <span className="text-gray-600 mx-1">·</span>
+                  <span className="text-red-400 font-bold">Bot {tavlaDurum.botToplanan}</span>
+                </div>
+                <button
+                  onClick={() => { setTavlaAcik(false); setTavlaDurum(null); }}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white"
+                >✕</button>
+              </div>
+            </div>
+
+            {/* Oyun Alanı */}
+            <div className="flex gap-4 p-4">
+
+              {/* TAVLA TAHTASI */}
+              <div className="flex-1 flex flex-col gap-2">
+                {/* Mesaj bandı */}
+                <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 flex justify-between items-center">
+                  <p className="text-white text-sm font-bold">{tavlaDurum.mesaj}</p>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-xl font-black text-white bg-black/50 w-8 h-8 rounded-lg flex items-center justify-center border border-white/20">
+                      {tavlaDurum.zar1}
+                    </span>
+                    <span className="text-xl font-black text-white bg-black/50 w-8 h-8 rounded-lg flex items-center justify-center border border-white/20">
+                      {tavlaDurum.zar2}
+                    </span>
+                    <span className="text-[10px] text-gray-500 ml-1">{tavlaDurum.hamleHaklari.length} hak</span>
+                  </div>
+                </div>
+
+                {/* Tahta */}
+                <div className="bg-amber-900/20 border-2 border-amber-700/40 rounded-2xl p-3 shadow-inner">
+                  {/* Üst Haneler (13-24) */}
+                  <div className="flex gap-1 mb-2">
+                    {tavlaDurum.tahta.slice(12,24).map((hane, i) => {
+                      const haneIdx = 12 + i;
+                      const secili = tavlaDurum.seciliHane === haneIdx;
+                      return (
+                        <button
+                          key={hane.index}
+                          onClick={() => tavlaHaneClick(haneIdx)}
+                          className={`flex-1 min-h-[80px] rounded-lg flex flex-col items-center justify-start pt-1 gap-0.5 transition-all
+                            ${secili ? 'bg-yellow-400/20 border-2 border-yellow-400' : 'bg-black/20 border border-white/5 hover:bg-white/5'}`}
+                        >
+                          <span className="text-[8px] text-gray-600 font-bold">{hane.index}</span>
+                          {Array.from({length: Math.min(hane.sayi, 5)}).map((_, pi) => (
+                            <div key={pi} className="w-5 h-5 rounded-full border flex items-center justify-center text-[9px] font-black shadow"
+                              style={{
+                                background: hane.renk === 'beyaz'
+                                  ? `linear-gradient(135deg, ${seciliTakim.renkA}, ${seciliTakim.renkB})`
+                                  : '#1e1e1e',
+                                borderColor: hane.renk === 'beyaz' ? seciliTakim.renkB : '#555'
+                              }}>
+                              {hane.renk === 'beyaz' ? seciliTakim.sembol : '●'}
+                            </div>
+                          ))}
+                          {hane.sayi > 5 && <span className="text-[8px] text-gray-400 font-black">+{hane.sayi-5}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Bar (Ortadaki bölücü) */}
+                  <div className="h-4 bg-amber-800/60 rounded flex items-center justify-center gap-4 border-y border-amber-700/50 mb-2">
+                    {tavlaDurum.oyuncuKirik > 0 && (
+                      <span className="text-[10px] font-black text-white bg-white/20 px-2 rounded">
+                        {seciliTakim.emoji} Kırık: {tavlaDurum.oyuncuKirik}
+                      </span>
+                    )}
+                    {tavlaDurum.botKirik > 0 && (
+                      <span className="text-[10px] font-black text-gray-900 bg-gray-400/80 px-2 rounded">
+                        ● Kırık: {tavlaDurum.botKirik}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Alt Haneler (1-12) */}
+                  <div className="flex gap-1">
+                    {tavlaDurum.tahta.slice(0,12).map((hane, i) => {
+                      const secili = tavlaDurum.seciliHane === i;
+                      return (
+                        <button
+                          key={hane.index}
+                          onClick={() => tavlaHaneClick(i)}
+                          className={`flex-1 min-h-[80px] rounded-lg flex flex-col items-center justify-end pb-1 gap-0.5 transition-all
+                            ${secili ? 'bg-yellow-400/20 border-2 border-yellow-400' : 'bg-black/20 border border-white/5 hover:bg-white/5'}`}
+                        >
+                          {Array.from({length: Math.min(hane.sayi, 5)}).map((_, pi) => (
+                            <div key={pi} className="w-5 h-5 rounded-full border flex items-center justify-center text-[9px] font-black shadow"
+                              style={{
+                                background: hane.renk === 'beyaz'
+                                  ? `linear-gradient(135deg, ${seciliTakim.renkA}, ${seciliTakim.renkB})`
+                                  : '#1e1e1e',
+                                borderColor: hane.renk === 'beyaz' ? seciliTakim.renkB : '#555'
+                              }}>
+                              {hane.renk === 'beyaz' ? seciliTakim.sembol : '●'}
+                            </div>
+                          ))}
+                          {hane.sayi > 5 && <span className="text-[8px] text-gray-400 font-black">+{hane.sayi-5}</span>}
+                          <span className="text-[8px] text-gray-600 font-bold">{hane.index}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* SAĞ PANEL: Kontroller */}
+              <div className="w-44 flex flex-col gap-3">
+                {/* Takım rozeti */}
+                <div className="rounded-2xl p-3 border border-white/10 text-center"
+                  style={{ background: `linear-gradient(135deg, ${seciliTakim.renkA}44, ${seciliTakim.renkB}22)` }}>
+                  <div className="text-3xl mb-1">{seciliTakim.emoji}</div>
+                  <div className="font-black text-white text-sm">{seciliTakim.ad}</div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">Senin takımın</div>
+                  <div className="flex justify-center gap-1 mt-2">
+                    <div className="w-4 h-4 rounded-full border" style={{background: seciliTakim.renkA, borderColor: seciliTakim.renkB}}></div>
+                    <div className="w-4 h-4 rounded-full border" style={{background: seciliTakim.renkB, borderColor: seciliTakim.renkA}}></div>
+                  </div>
+                </div>
+
+                {/* Zar at butonu */}
+                {tavlaDurum.sira === 'oyuncu' && tavlaDurum.hamleHaklari.length === 0 && !tavlaDurum.bitti && (
+                  <button onClick={tavlaZarAt}
+                    className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-3 rounded-xl text-sm hover:brightness-110 active:scale-95 transition-all shadow-lg">
+                    🎲 Zar At
+                  </button>
+                )}
+
+                {/* Hamle iptali */}
+                {tavlaDurum.seciliHane !== null && (
+                  <button onClick={() => setTavlaDurum(p => p ? {...p, seciliHane: null} : p)}
+                    className="bg-red-950/50 border border-red-900/40 text-red-400 font-bold py-2 rounded-xl text-xs hover:bg-red-900/40">
+                    ✕ Seçimi İptal
+                  </button>
+                )}
+
+                {/* Oyun bitti */}
+                {tavlaDurum.bitti && (
+                  <button onClick={() => setTavlaDurum(yeniTavlaOyunu())}
+                    className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black py-2 rounded-xl text-xs hover:brightness-110">
+                    🔄 Yeniden Oyna
+                  </button>
+                )}
+
+                {/* Skor */}
+                <div className="bg-black/40 border border-white/10 rounded-xl p-3 text-xs space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Eve aldın:</span>
+                    <span className="font-black text-green-400">{tavlaDurum.oyuncuToplanan}/15</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Bot eve:</span>
+                    <span className="font-black text-red-400">{tavlaDurum.botToplanan}/15</span>
+                  </div>
+                  <div className="h-px bg-white/10"></div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Hamle:</span>
+                    <span className="font-bold text-white">{tavlaDurum.hamleHaklari.length} hak</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Sıra:</span>
+                    <span className={`font-black text-xs ${tavlaDurum.sira === 'oyuncu' ? 'text-green-400' : 'text-orange-400'}`}>
+                      {tavlaDurum.sira === 'oyuncu' ? '🟢 Sen' : '🔴 Bot'}
+                    </span>
+                  </div>
+                </div>
+
+                <button onClick={() => { setTavlaAcik(false); setTavlaDurum(null); }}
+                  className="bg-red-950/40 border border-red-900/30 text-red-400 font-bold py-2 rounded-xl text-xs hover:bg-red-900/30 mt-auto">
+                  ✕ Masadan Kalk
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: MASA AÇ — OYUN SEÇİM EKRANI                       */}
+      {/* ======================================================== */}
+      {oyunSecimAcik && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md">
+          <div className="relative w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 border border-white/10 rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.8)] overflow-hidden">
+            
+            {/* Başlık */}
+            <div className="bg-gradient-to-r from-purple-700 to-indigo-700 px-6 py-4 flex justify-between items-center">
+              <div>
+                <h2 className="font-black text-xl text-white tracking-wide drop-shadow">🎮 Masa Aç</h2>
+                <p className="text-purple-200 text-[11px] mt-0.5">Oyun türünü seç, masanı aç</p>
+              </div>
+              <button
+                onClick={() => setOyunSecimAcik(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white transition-all"
+              >✕</button>
+            </div>
+
+            {/* Oyun Kartları */}
+            <div className="p-5 flex flex-col gap-3">
+
+              {/* Okey */}
+              <button
+                onClick={() => masaAc("101 Okey")}
+                className="group w-full bg-gradient-to-r from-orange-600/20 to-amber-600/20 hover:from-orange-600/40 hover:to-amber-600/40 border border-orange-500/40 hover:border-orange-400 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98]"
+              >
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-3xl shadow-lg flex-shrink-0">📿</div>
+                <div className="text-left flex-1">
+                  <div className="font-black text-white text-base tracking-wide">101 Okey</div>
+                  <div className="text-orange-300 text-[11px] mt-0.5">2-4 oyuncu · Taş oyunu · Türk klasiği</div>
+                </div>
+                <div className="text-orange-400 text-xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">›</div>
+              </button>
+
+              {/* Pişti */}
+              <button
+                onClick={() => masaAc("Pişti")}
+                className="group w-full bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/40 hover:to-indigo-600/40 border border-blue-500/40 hover:border-blue-400 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98]"
+              >
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-3xl shadow-lg flex-shrink-0">🃏</div>
+                <div className="text-left flex-1">
+                  <div className="font-black text-white text-base tracking-wide">Pişti</div>
+                  <div className="text-blue-300 text-[11px] mt-0.5">2 oyuncu · İskambil · Hızlı ve eğlenceli</div>
+                </div>
+                <div className="text-blue-400 text-xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">›</div>
+              </button>
+
+              {/* Tavla */}
+              <button
+                onClick={() => masaAc("Tavla")}
+                className="group w-full bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-600/40 hover:to-teal-600/40 border border-emerald-500/40 hover:border-emerald-400 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98]"
+              >
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-3xl shadow-lg flex-shrink-0">🎲</div>
+                <div className="text-left flex-1">
+                  <div className="font-black text-white text-base tracking-wide">Tavla</div>
+                  <div className="text-emerald-300 text-[11px] mt-0.5">2 oyuncu · Zar oyunu · Strateji ve şans</div>
+                </div>
+                <div className="text-emerald-400 text-xl opacity-60 group-hover:opacity-100 group-hover:translate-x-1 transition-all">›</div>
+              </button>
+
+            </div>
+
+            {/* Alt bilgi */}
+            <div className="px-5 pb-5">
+              <p className="text-center text-gray-600 text-[10px]">Masana katılmak isteyen oyuncular seni bulacak</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: MASA AÇILDI — OYUNCU BEKLEME EKRANI                */}
+      {/* ======================================================== */}
+      {oyunBekleme && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-lg">
+          <div className="w-[440px] bg-gradient-to-b from-slate-900 to-slate-950 border border-white/10 rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.9)] overflow-hidden">
+
+            {/* Başlık */}
+            <div className={`px-6 py-4 ${
+              aktifOyun === "101 Okey"
+                ? "bg-gradient-to-r from-orange-600 to-amber-600"
+                : aktifOyun === "Pişti"
+                ? "bg-gradient-to-r from-blue-600 to-indigo-600"
+                : "bg-gradient-to-r from-emerald-600 to-teal-600"
+            }`}>
+              <div className="flex items-center gap-3">
+                <span className="text-4xl">
+                  {aktifOyun === "101 Okey" ? "📿" : aktifOyun === "Pişti" ? "🃏" : "🎲"}
+                </span>
+                <div>
+                  <h2 className="font-black text-xl text-white">{aktifOyun} Masası</h2>
+                  <p className="text-white/80 text-[11px]">Masa açıldı, oyuncular bekleniyor...</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Bekleme Animasyonu */}
+            <div className="flex flex-col items-center py-8 px-6">
+
+              {/* Dönen bekleme halkası */}
+              <div className="relative w-24 h-24 mb-6">
+                <div className="absolute inset-0 rounded-full border-4 border-white/5"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-t-transparent border-l-transparent border-r-transparent animate-spin"
+                  style={{
+                    borderBottomColor: aktifOyun === "101 Okey" ? "#f97316" : aktifOyun === "Pişti" ? "#3b82f6" : "#10b981"
+                  }}
+                ></div>
+                <div className="absolute inset-0 flex items-center justify-center text-4xl">
+                  {aktifOyun === "101 Okey" ? "📿" : aktifOyun === "Pişti" ? "🃏" : "🎲"}
+                </div>
+              </div>
+
+              <h3 className="font-black text-white text-lg mb-1">Oyuncu Bekleniyor</h3>
+              <p className="text-gray-400 text-xs text-center mb-6">
+                Masana katılacak rakipler aranıyor.<br/>Bu birkaç saniye sürebilir.
+              </p>
+
+              {/* Masa bilgileri */}
+              <div className="w-full bg-black/40 rounded-2xl border border-white/10 p-4 mb-5 space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Oyun Türü</span>
+                  <span className="font-bold text-white">{aktifOyun}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Masa Sahibi</span>
+                  <span className="font-bold text-yellow-400">{isim}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Giriş Ücreti</span>
+                  <span className="font-bold text-green-400">Ücretsiz</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Durum</span>
+                  <span className="flex items-center gap-1.5 font-bold text-green-400">
+                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block"></span>
+                    Aktif
+                  </span>
+                </div>
+              </div>
+
+              {/* Hazırım / İptal butonları */}
+              <div className="w-full flex gap-3">
+                <button
+                  onClick={() => { setOyunBekleme(false); setAktifOyun(""); setHazirTik(false); }}
+                  className="flex-1 bg-red-950/60 hover:bg-red-900/60 text-red-400 border border-red-900/40 font-bold py-3 rounded-xl text-sm transition-all"
+                >
+                  ✕ Masayı Kapat
+                </button>
+                <button
+                  onClick={() => setHazirTik(!hazirTik)}
+                  className={`flex-1 font-black py-3 rounded-xl text-sm transition-all border ${
+                    hazirTik
+                      ? "bg-green-600 border-green-400 text-white shadow-[0_0_20px_rgba(34,197,94,0.4)]"
+                      : "bg-green-900/40 border-green-700/50 text-green-400 hover:bg-green-800/40"
+                  }`}
+                >
+                  {hazirTik ? "✓ Hazırım!" : "Hazırım"}
+                </button>
+              </div>
+
+            </div>
+          </div>
         </div>
       )}
 
