@@ -586,9 +586,15 @@ export default function LoungeApp() {
           <button onClick={() => alert("🚀 Tavla Salonu Açılıyor...")} className="bg-gradient-to-b from-emerald-600/90 to-teal-900/90 backdrop-blur-sm border border-emerald-400/40 p-3 rounded-xl flex flex-col justify-between items-center text-center h-28 shadow-lg hover:brightness-105 active:scale-95 transition-all">
             <span className="text-2xl block drop-shadow-md">🎲</span><span className="text-xs font-black uppercase tracking-wider block text-white drop-shadow-md">Tavla</span><span className="text-[8px] text-emerald-100 uppercase tracking-widest block bg-emerald-950/80 px-1.5 py-0.5 rounded shadow">Masa Aç</span>
           </button>
-          <button onClick={() => alert("🎖️ Lig rütbeleri")} className="bg-gradient-to-b from-purple-600/90 to-purple-950/90 backdrop-blur-sm border border-purple-400/40 p-3 rounded-xl flex flex-col justify-between items-center text-center h-28 shadow-lg hover:brightness-105 active:scale-95 transition-all">
-            <span className="text-2xl block drop-shadow-md">🎖️</span><span className="text-xs font-black uppercase tracking-wider block text-white drop-shadow-md">Ligler</span><span className="text-[8px] text-purple-100 uppercase tracking-widest block bg-purple-950/80 px-1.5 py-0.5 rounded shadow">Efsane</span>
-          </button>
+          {/* LİGLER BUTONUNUN OLDUĞU YERİ ŞU ŞEKİLDE GÜNCELLE: */}
+<button 
+  onClick={() => setOyunSecimAcik(true)} 
+  className="bg-gradient-to-b from-purple-600/90 to-purple-950/90 backdrop-blur-sm border border-purple-400/40 p-3 rounded-xl flex flex-col justify-between items-center text-center h-28 shadow-lg hover:brightness-105 active:scale-95 transition-all"
+>
+  <span className="text-2xl block drop-shadow-md">🎮</span>
+  <span className="text-[10px] font-black uppercase tracking-wider block text-white drop-shadow-md">MASA AÇ</span>
+  <span className="text-[8px] text-purple-100 uppercase tracking-widest block bg-purple-950/80 px-1.5 py-0.5 rounded shadow">YENİ OYUN</span>
+</button>
           
           <div className="col-span-2 bg-black/50 backdrop-blur-md border border-white/20 rounded-xl p-2.5 flex flex-col justify-between h-36 shadow-xl">
             <span className="text-[9px] text-gray-300 font-bold block border-b border-white/20 pb-1 drop-shadow">🎙️ SOHBET ODASI VE GÖNDERİLER</span>
