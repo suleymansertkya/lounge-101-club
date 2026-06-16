@@ -37,6 +37,14 @@ interface GelenBegeni extends OyuncuProfil {
   alindi: boolean;
 }
 
+interface HediyeCipGecmisKaydi {
+  id: number;
+  oyuncuId: string;
+  oyuncuAd: string;
+  miktar: number;
+  tarih: string;
+}
+
 interface LiderlikOyuncusu extends OyuncuProfil {
   avatar: string;
   tac?: string;
@@ -64,13 +72,15 @@ interface SohbetGonderisi {
 }
 
 type GirisYontemi = "Google" | "Facebook" | "iOS" | "Misafir" | "Web";
+type CihazModu = "web" | "mobile" | "facebook";
 
 interface BekleyenOdeme {
-  tur: "kampanya" | "cip" | "vip" | "istaka" | "istakaHediye";
+  tur: "kampanya" | "cip" | "elmas" | "vip" | "istaka" | "istakaHediye";
   baslik: string;
   aciklama: string;
   fiyat: string;
   miktar?: number;
+  elmas?: number;
   vipSeviye?: number;
   istakaId?: number;
   hediyeHedefId?: string;
@@ -253,6 +263,7 @@ interface OkeyDurum {
   aktifOyuncu: number; // 0 = sen
   atilanTas: OkeyTas | null;
   atilanTasGecmisi: { oyuncuIdx: number; tas: OkeyTas }[]; // son atılan taşlar
+  oyuncuTasCektiMi?: boolean;
   mesaj: string;
   bitti: boolean;
   berabere?: boolean;
@@ -289,7 +300,7 @@ function yeniOkeyOyunu(oyuncuIsim: string): OkeyDurum {
   ];
   const dagitim = [...deste];
   oyuncular.forEach((o, i) => { o.el = dagitim.splice(0, i===0 ? 22 : 21); });
-  return { oyuncular, kalanDeste: dagitim, gosterge, okeyRenk: gosterge.renk, okeyDeger, aktifOyuncu: 0, atilanTas: null, atilanTasGecmisi: [], mesaj: 'Taş at veya çek!', bitti: false, minAcmaPuani: 101, katlamali: false };
+  return { oyuncular, kalanDeste: dagitim, gosterge, okeyRenk: gosterge.renk, okeyDeger, aktifOyuncu: 0, atilanTas: null, atilanTasGecmisi: [], oyuncuTasCektiMi: true, mesaj: 'İlk elde fazla taş sende. Önce bir taş at.', bitti: false, minAcmaPuani: 101, katlamali: false };
 }
 
 const TAS_RENK_STIL: Record<TasRengi, string> = {
@@ -378,14 +389,7 @@ function yeniTavlaOyunu(): TavlaDurumu {
 
 function HaftalikOdulGorseli({ tur }: { tur: "cip" | "elmas" }) {
   if (tur === "elmas") {
-    return (
-      <div className="relative h-28 w-28">
-        <div className="absolute left-1/2 top-4 h-20 w-20 -translate-x-1/2 rotate-45 rounded-xl border-2 border-cyan-100 bg-gradient-to-br from-sky-200 via-cyan-400 to-blue-700 shadow-[0_14px_28px_rgba(14,165,233,0.35)]"></div>
-        <div className="absolute left-1/2 top-3 h-9 w-20 -translate-x-1/2 rotate-45 rounded-t-xl border-t-2 border-l-2 border-white/70 bg-white/35"></div>
-        <div className="absolute left-1/2 top-[43px] h-8 w-8 -translate-x-1/2 rotate-45 rounded-md bg-white/30"></div>
-        <div className="absolute inset-x-0 bottom-2 mx-auto h-4 w-20 rounded-full bg-cyan-900/20 blur-sm"></div>
-      </div>
-    );
+    return <ElmasSimgesi boyut="xl" />;
   }
 
   return (
@@ -399,6 +403,25 @@ function HaftalikOdulGorseli({ tur }: { tur: "cip" | "elmas" }) {
       </div>
       <div className="absolute left-[65px] top-7 h-5 w-2 rotate-12 rounded-full bg-white/70 blur-[1px]"></div>
     </div>
+  );
+}
+
+function ElmasSimgesi({ boyut = "md", className = "" }: { boyut?: "xs" | "sm" | "md" | "lg" | "xl"; className?: string }) {
+  const boyutlar = {
+    xs: "h-4 w-4",
+    sm: "h-5 w-5",
+    md: "h-7 w-7",
+    lg: "h-10 w-10",
+    xl: "h-28 w-28",
+  };
+
+  return (
+    <span className={`relative inline-flex shrink-0 items-center justify-center align-middle ${boyutlar[boyut]} ${className}`} aria-hidden="true">
+      <span className="absolute left-1/2 top-[16%] h-[68%] w-[68%] -translate-x-1/2 rotate-45 rounded-[18%] border-2 border-cyan-100 bg-gradient-to-br from-sky-200 via-cyan-400 to-blue-700 shadow-[0_10px_24px_rgba(14,165,233,0.38)]"></span>
+      <span className="absolute left-1/2 top-[12%] h-[31%] w-[68%] -translate-x-1/2 rotate-45 rounded-t-lg border-l-2 border-t-2 border-white/70 bg-white/35"></span>
+      <span className="absolute left-1/2 top-[39%] h-[25%] w-[25%] -translate-x-1/2 rotate-45 rounded bg-white/30"></span>
+      <span className="absolute inset-x-[14%] bottom-[5%] h-[12%] rounded-full bg-cyan-900/20 blur-sm"></span>
+    </span>
   );
 }
 
@@ -421,6 +444,8 @@ function CipSimgesi({ boyut = "sm", className = "" }: { boyut?: "xs" | "sm" | "m
 }
 
 export default function LoungeApp() {
+  const [cihazModu, setCihazModu] = useState<CihazModu>("web");
+  const [acilisYukleniyor, setAcilisYukleniyor] = useState(true);
   const [girisYapildi, setGirisYapildi] = useState(false);
   const [girisYontemi, setGirisYontemi] = useState<GirisYontemi>("Web");
   const [oyunSecimAcik, setOyunSecimAcik] = useState(false);
@@ -522,6 +547,24 @@ export default function LoungeApp() {
   };
   const [profilBasariKategori, setProfilBasariKategori] = useState<string>('Otomatik Eşleşme');
 
+  const kendiProfiliniAc = () => {
+    setOkeyProfilAcik(false);
+    setSeciliArkadasProfil(null);
+    setAvatarSecimAcik(false);
+    setProfilDuzenleme(null);
+    setProfilSekme('profil');
+    setProfilModalAcik(true);
+  };
+
+  const oyunProfiliniAc = (idx: number) => {
+    if (idx === 0) {
+      kendiProfiliniAc();
+      return;
+    }
+    setOkeyProfilIndex(idx);
+    setOkeyProfilAcik(true);
+  };
+
   const okeyIstakaRef = useRef<HTMLDivElement | null>(null);
   const bildirimZamanlayiciRef = useRef<number | null>(null);
   const [okeyTasPozisyonlari, setOkeyTasPozisyonlari] = useState<Record<number, { x: number; y: number }>>({});
@@ -533,6 +576,30 @@ export default function LoungeApp() {
   const [tavlaTakimSecimAcik, setTavlaTakimSecimAcik] = useState(false);
   const [seciliTakim, setSeciliTakim] = useState(FUTBOL_TAKIMLARI[0]);
   const [sahipOlunanTakimlar, setSahipOlunanTakimlar] = useState<number[]>([1]);
+
+  useEffect(() => {
+    const cihazOlceginiGuncelle = () => {
+      const userAgent = navigator.userAgent || "";
+      const facebookTarayici = /FBAN|FBAV|FB_IAB|Instagram|Messenger/i.test(userAgent);
+      const dokunmatik = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+      const darEkran = window.innerWidth <= 820;
+      const mod: CihazModu = facebookTarayici ? "facebook" : (darEkran || dokunmatik ? "mobile" : "web");
+      setCihazModu(mod);
+      document.documentElement.dataset.device = mod;
+      document.documentElement.style.setProperty("--app-height", `${window.innerHeight}px`);
+    };
+
+    cihazOlceginiGuncelle();
+    const yuklemeTimer = window.setTimeout(() => setAcilisYukleniyor(false), 1450);
+    window.addEventListener("resize", cihazOlceginiGuncelle);
+    window.addEventListener("orientationchange", cihazOlceginiGuncelle);
+
+    return () => {
+      window.clearTimeout(yuklemeTimer);
+      window.removeEventListener("resize", cihazOlceginiGuncelle);
+      window.removeEventListener("orientationchange", cihazOlceginiGuncelle);
+    };
+  }, []);
 
   // --- MASA AÇ FONKSİYONU ---
   const masaAc = (oyunTuru: string) => {
@@ -793,13 +860,16 @@ export default function LoungeApp() {
   const okeyTasAt = (tasId: number) => {
     setOkeyDurum(prev => {
       if (!prev || prev.aktifOyuncu !== 0 || prev.bitti) return prev;
+      if (!prev.oyuncuTasCektiMi && prev.oyuncular[0].el.length <= 21) {
+        return { ...prev, mesaj: 'Önce desteden taş çek veya yerdeki taşı al.' };
+      }
       const d = { ...prev, oyuncular: prev.oyuncular.map(o => ({...o, el:[...o.el]})) };
       const el = d.oyuncular[0].el;
       const idx = el.findIndex(t => t.id === tasId);
       if (idx === -1) return prev;
       const [atilanTas] = el.splice(idx, 1);
       d.atilanTas = atilanTas;
-      d.atilanTasGecmisi = [...(d.atilanTasGecmisi || []).slice(-5), { oyuncuIdx: 0, tas: atilanTas }];
+      d.atilanTasGecmisi = [...(d.atilanTasGecmisi || []).slice(-11), { oyuncuIdx: 0, tas: atilanTas }];
       if (el.length === 0) {
         const analiz = okeyElAcmaAnalizi([atilanTas, ...el]);
         if (d.oyuncular[0].acildi || analiz.acabilir) {
@@ -816,14 +886,16 @@ export default function LoungeApp() {
         d.atilanTas = null;
         return d;
       }
-      d.aktifOyuncu = 1;
+      d.oyuncuTasCektiMi = false;
+      d.aktifOyuncu = 3;
       d.mesaj = `${atilanTas.okeyMi ? 'JOKER' : atilanTas.renk+' '+atilanTas.deger} attın. Bot sırası...`;
       return d;
     });
     setOkeyTimerAktif(false);
     setOkeyTimer(15);
-    // Bot turları — her bot 2 saniye bekler
-    const botOyna = (botIdx: number) => {
+    const botSirasi = [3, 2, 1];
+    const botOyna = (siraIndex: number) => {
+      const botIdx = botSirasi[siraIndex];
       setTimeout(() => {
         setOkeyDurum(prev => {
           if (!prev || prev.bitti) return prev;
@@ -844,7 +916,7 @@ export default function LoungeApp() {
             if (atIdx !== -1) {
               const [botAtilanTas] = elBot.splice(atIdx, 1);
               d.atilanTas = botAtilanTas;
-              d.atilanTasGecmisi = [...(d.atilanTasGecmisi || []).slice(-5), { oyuncuIdx: botIdx, tas: botAtilanTas }];
+              d.atilanTasGecmisi = [...(d.atilanTasGecmisi || []).slice(-11), { oyuncuIdx: botIdx, tas: botAtilanTas }];
               if (elBot.length === 0) {
                 if (d.oyuncular[botIdx].acildi || okeyElAcmaAnalizi([botAtilanTas, ...elBot]).acabilir) {
                   d.oyuncular[botIdx].acildi = true;
@@ -856,29 +928,35 @@ export default function LoungeApp() {
               }
             }
           }
-          if (botIdx === 3) {
+          const sonrakiBot = botSirasi[siraIndex + 1];
+          if (sonrakiBot === undefined) {
             d.aktifOyuncu = 0;
+            d.oyuncuTasCektiMi = false;
             d.mesaj = 'Sıra sende! Desteden çek veya yerdekini al.';
           } else {
-            d.aktifOyuncu = botIdx + 1;
+            d.aktifOyuncu = sonrakiBot;
           }
           return d;
         });
-        if (botIdx < 3) botOyna(botIdx + 1);
+        if (siraIndex < botSirasi.length - 1) botOyna(siraIndex + 1);
         else { setOkeyTimer(15); setOkeyTimerAktif(true); }
       }, 2000);
     };
-    botOyna(1);
+    botOyna(0);
   };
 
   // --- OKEY: Desteden Taş Çek ---
   const okeyTasCek = () => {
     setOkeyDurum(prev => {
       if (!prev || prev.aktifOyuncu !== 0 || prev.bitti) return prev;
+      if (prev.oyuncuTasCektiMi || prev.oyuncular[0].el.length >= 22) {
+        return { ...prev, mesaj: 'Önce elinden bir taş atmalısın.' };
+      }
       if (prev.kalanDeste.length === 0) return { ...prev, bitti: true, berabere: true, kazananIndex: -1, mesaj: '🏁 Deste bitti. Kimse açamadı; girişler iade.' };
       const d = { ...prev, kalanDeste: [...prev.kalanDeste], oyuncular: prev.oyuncular.map(o=>({...o,el:[...o.el]})) };
       const [cekilen] = d.kalanDeste.splice(0, 1);
       d.oyuncular[0].el.push(cekilen);
+      d.oyuncuTasCektiMi = true;
       d.mesaj = `${cekilen.okeyMi ? '🎉 JOKER çektin!' : `${cekilen.renk} ${cekilen.deger} çektin.`} Şimdi bir taş at.`;
       return d;
     });
@@ -888,11 +966,15 @@ export default function LoungeApp() {
   const okeyYerdekiniAl = () => {
     setOkeyDurum(prev => {
       if (!prev || prev.aktifOyuncu !== 0 || !prev.atilanTas || prev.bitti) return prev;
+      if (prev.oyuncuTasCektiMi || prev.oyuncular[0].el.length >= 22) {
+        return { ...prev, mesaj: 'Önce elinden bir taş atmalısın.' };
+      }
       const d = { ...prev, oyuncular: prev.oyuncular.map(o=>({...o,el:[...o.el]})) };
       const yerdekiTas = d.atilanTas;
       if (!yerdekiTas) return prev;
       d.oyuncular[0].el.push(yerdekiTas);
       d.atilanTas = null;
+      d.oyuncuTasCektiMi = true;
       d.mesaj = 'Yerdeki taşı aldın. Şimdi bir taş at.';
       return d;
     });
@@ -912,7 +994,7 @@ export default function LoungeApp() {
   const [kusanilanIstaka, setKusanilanIstaka] = useState<number>(1);
 
   // PANELERİN AÇIK/KAPALI DURUMLARI
-  const [magazaAktifSekme, setMagazaAktifSekme] = useState<"çipler" | "vip" | "bonus" | "oge" | "puan" | "klan" | "nostalji">("çipler");
+  const [magazaAktifSekme, setMagazaAktifSekme] = useState<"çipler" | "vip" | "elmas" | "oge" | "puan" | "klan" | "nostalji">("çipler");
   const [aktifSekme, setAktifSekme] = useState<"çipler" | "ıstakalar" | "çerçeveler">("çipler");
   
   const [cantaAcik, setCantaAcik] = useState(false);
@@ -931,6 +1013,9 @@ export default function LoungeApp() {
   const [hediyeCipTargetId, setHediyeCipTargetId] = useState("");
   const [hediyeCipMiktar, setHediyeCipMiktar] = useState("");
   const [miniArkadasSecAcik, setMiniArkadasSecAcik] = useState(false);
+  const [hediyeCipGecmisAcik, setHediyeCipGecmisAcik] = useState(false);
+  const [hediyeCipArkadasSekmesi, setHediyeCipArkadasSekmesi] = useState<"arkadaslar" | "klan">("arkadaslar");
+  const [hediyeCipGecmisi, setHediyeCipGecmisi] = useState<HediyeCipGecmisKaydi[]>([]);
 
   const [hediyePaneliAcik, setHediyePaneliAcik] = useState(false);
   const [hediyeHedefOyuncu, setHediyeHedefOyuncu] = useState<OyuncuProfil | null>(null);
@@ -1224,6 +1309,15 @@ export default function LoungeApp() {
     { id: 8, ad: "Oligark Zirve Paketi", miktar: 35000000, miktarYazi: "35.000.000 Çip", fiyat: "1.899,99 TL", populer: false, bg: "from-red-950 via-purple-950 to-black" },
   ];
 
+  const elmasPaketleri = [
+    { id: 1, ad: "Başlangıç Elması", miktar: 10, miktarYazi: "10 Elmas", fiyat: "19,99 TL", etiket: "" },
+    { id: 2, ad: "Kulüp Elması", miktar: 25, miktarYazi: "25 Elmas", fiyat: "39,99 TL", etiket: "" },
+    { id: 3, ad: "Parlak Paket", miktar: 60, miktarYazi: "60 Elmas", fiyat: "89,99 TL", etiket: "Avantajlı" },
+    { id: 4, ad: "Lounge Elmas", miktar: 120, miktarYazi: "120 Elmas", fiyat: "149,99 TL", etiket: "Popüler" },
+    { id: 5, ad: "Kraliyet Paketi", miktar: 260, miktarYazi: "260 Elmas", fiyat: "299,99 TL", etiket: "Lounge" },
+    { id: 6, ad: "Zirve Elmas", miktar: 600, miktarYazi: "600 Elmas", fiyat: "599,99 TL", etiket: "Büyük Paket" },
+  ];
+
   const vipPaketleri = [
     { seviye: 1, fiyat: "19,99 TL", ad: "VIP Seviye 1", bg: "bg-orange-950" },
     { seviye: 2, fiyat: "29,99 TL", ad: "VIP Seviye 2", bg: "bg-orange-900" },
@@ -1456,8 +1550,15 @@ export default function LoungeApp() {
   };
 
   const hediyeCipGonderAksiyonu = () => {
-    if (hediyeCipTargetId.trim() === "" || hediyeCipMiktar.trim() === "") {
+    const hedefId = hediyeCipTargetId.trim();
+    const hedefOyuncu = oyuncuAramaHavuzu.find((oyuncu) => oyuncu.id === hedefId);
+
+    if (hedefId === "" || hediyeCipMiktar.trim() === "") {
       bildirimGoster("Eksik bilgi", "Oyuncu ID ve çip miktarını eksiksiz gir.", "bilgi");
+      return;
+    }
+    if (!hedefOyuncu) {
+      bildirimGoster("Oyuncu bulunamadı", "Lütfen kayıtlı oyuncu ID gir veya arkadaş listesinden seç.", "bilgi");
       return;
     }
     const miktar = parseInt(hediyeCipMiktar);
@@ -1466,9 +1567,16 @@ export default function LoungeApp() {
       return;
     }
     if (bakiyeCip >= miktar) {
+      const saat = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
       setBakiyeCip(prev => prev - miktar);
-      bildirimGoster("Çip gönderildi", `ID: ${hediyeCipTargetId} oyuncusuna ${miktar.toLocaleString()} çip gönderildi.`, "basari");
+      setHediyeCipGecmisi((onceki) => [
+        { id: Date.now(), oyuncuId: hedefId, oyuncuAd: hedefOyuncu.ad, miktar, tarih: `Bugün ${saat}` },
+        ...onceki,
+      ].slice(0, 12));
+      bildirimGoster("Çip gönderildi", `${hedefOyuncu.ad} oyuncusuna ${miktar.toLocaleString()} çip gönderildi.`, "basari");
       setHediyeCipPanelAcik(false);
+      setMiniArkadasSecAcik(false);
+      setHediyeCipGecmisAcik(false);
       setHediyeCipTargetId("");
       setHediyeCipMiktar("");
     } else {
@@ -1642,6 +1750,15 @@ export default function LoungeApp() {
         giftTargetId: odeme.hediyeHedefId,
       };
     }
+    if (odeme.tur === "elmas") {
+      return {
+        kind: "diamonds",
+        productId: `diamonds_${odeme.elmas || 0}`,
+        productName: odeme.aciklama,
+        price: odeme.fiyat,
+        diamonds: odeme.elmas,
+      };
+    }
     return {
       kind: "chips",
       productId: `chips_${odeme.miktar || 0}`,
@@ -1678,6 +1795,12 @@ export default function LoungeApp() {
       const chips = Number(entitlement.chips);
       setBakiyeCip((prev) => prev + chips);
       bildirimGoster("Ödeme onaylandı", `+${chips.toLocaleString()} çip hesabına eklendi.`, "basari");
+      return;
+    }
+    if (entitlement.kind === "diamonds" && entitlement.diamonds) {
+      const diamonds = Number(entitlement.diamonds);
+      setBakiyeElmas((prev) => prev + diamonds);
+      bildirimGoster("Ödeme onaylandı", `+${diamonds.toLocaleString()} elmas hesabına eklendi.`, "basari");
     }
   };
 
@@ -1873,11 +1996,21 @@ export default function LoungeApp() {
     });
   };
 
+  const elmasSatinAl = (elmasMiktar: number, fiyat: string) => {
+    odemeBaslat({
+      tur: "elmas",
+      baslik: "Elmas Paketi",
+      aciklama: `${elmasMiktar.toLocaleString()} Elmas`,
+      fiyat,
+      elmas: elmasMiktar,
+    });
+  };
+
   const kampanyaCipSatinAl = () => {
     setKampanyaAcik(false);
     odemeBaslat({
       tur: "kampanya",
-      baslik: "Kısa Süreli Kampanya",
+      baslik: "Günlük İndirim Paketi",
       aciklama: "100.000 Çip",
       fiyat: "10 TL",
       miktar: 100000,
@@ -2075,9 +2208,42 @@ export default function LoungeApp() {
     setSeciliArkadasProfil(oyuncu);
   };
   const aktifLiderlikBaslik = siralamaSekme === "sehir" ? profilSehir : siralamaSekme === "bolge" ? profilBolge : "Genel";
+  const hediyeCipArkadaslari = hediyeCipArkadasSekmesi === "arkadaslar"
+    ? arkadasListesi
+    : [...takipcilerListesi, ...takipEdilenListesi].slice(0, 10);
+  const hediyeCipSeciliOyuncu = oyuncuAramaHavuzu.find((oyuncu) => oyuncu.id === hediyeCipTargetId.trim());
+  const hediyeCipMasraf = 0;
+  const gunlukIndirimPaketi = {
+    cip: 100000,
+    cipYazi: "100.000",
+    fiyat: "10 TL",
+    normalFiyat: "19,99 TL",
+    indirimOrani: 50,
+  };
 
   return (
-    <div className="relative w-full h-screen text-white p-3 overflow-hidden flex flex-col justify-between select-none font-sans">
+    <div
+      data-device={cihazModu}
+      className="lounge-shell relative w-full h-[var(--app-height,100svh)] text-white p-3 overflow-hidden flex flex-col justify-between select-none font-sans"
+    >
+      {acilisYukleniyor && (
+        <div className="fixed inset-0 z-[10000] overflow-hidden bg-slate-950 text-white">
+          <img
+            src="/loading-okey-lounge.png"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-black/70"></div>
+          <div className="absolute inset-x-0 bottom-[max(36px,env(safe-area-inset-bottom))] z-10 mx-auto flex w-[min(720px,84vw)] flex-col items-center gap-4 px-2">
+            <div className="rounded-full border border-white/20 bg-black/38 px-5 py-2 text-base font-black tracking-wide text-white shadow-[0_10px_30px_rgba(0,0,0,0.4)] backdrop-blur-sm md:text-xl">
+              Oyun yükleniyor
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full border border-white/15 bg-black/45 shadow-[0_10px_26px_rgba(0,0,0,0.45)]">
+              <div className="loading-progress h-full rounded-full bg-gradient-to-r from-cyan-300 via-emerald-300 to-yellow-300"></div>
+            </div>
+          </div>
+        </div>
+      )}
       {uygulamaBildirimi && (
         <div className="fixed left-1/2 top-5 z-[9900] w-[min(520px,92vw)] -translate-x-1/2 rounded-2xl border border-white/25 bg-slate-950/90 px-4 py-3 shadow-[0_18px_45px_rgba(0,0,0,0.45)] backdrop-blur-md">
           <div className="flex items-center gap-3">
@@ -2094,9 +2260,167 @@ export default function LoungeApp() {
       )}
 
       {kampanyaAcik && (
+        <div
+          className="daily-deal-modal fixed inset-0 z-[9500] flex items-center justify-center overflow-hidden bg-black/72 p-4 backdrop-blur-[3px]"
+          onClick={() => setKampanyaAcik(false)}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(253,186,116,0.18),transparent_30%),radial-gradient(circle_at_82%_18%,rgba(56,189,248,0.16),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.08)_0_1px,transparent_1px_18px)]"></div>
+          <div
+            className="daily-deal-card relative h-[min(650px,88vh)] w-[min(1180px,96vw)] overflow-hidden rounded-[34px] border border-white/25 bg-gradient-to-br from-[#101428] via-[#17264b] to-[#07111f] shadow-[0_42px_110px_rgba(0,0,0,0.72)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="absolute inset-0 opacity-70 bg-[radial-gradient(circle_at_38%_44%,rgba(255,246,196,0.2),transparent_26%),radial-gradient(circle_at_72%_28%,rgba(236,72,153,0.2),transparent_20%),radial-gradient(circle_at_22%_78%,rgba(34,211,238,0.16),transparent_28%)]"></div>
+            <div className="absolute -left-24 -top-28 h-80 w-80 rounded-full bg-yellow-300/18 blur-3xl"></div>
+            <div className="absolute -right-20 bottom-[-90px] h-96 w-96 rounded-full bg-cyan-300/18 blur-3xl"></div>
+            <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-white/10 to-transparent"></div>
+
+            <button
+              type="button"
+              onClick={() => setKampanyaAcik(false)}
+              className="absolute right-7 top-6 z-30 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white/55 bg-black/25 text-5xl font-light leading-none text-white shadow-[0_0_26px_rgba(255,255,255,0.25)] hover:bg-white/15"
+              aria-label="Kapat"
+            >
+              ×
+            </button>
+
+            <div className="daily-deal-layout relative z-10 grid h-full grid-cols-[0.95fr_1.25fr_0.8fr] items-center gap-2 px-12 py-10 text-white">
+              <section className="daily-deal-copy self-start pt-8">
+                <div className="inline-flex rounded-full border border-cyan-200/40 bg-cyan-300/15 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-cyan-100 shadow">
+                  Sadece Bugün
+                </div>
+                <h2 className="mt-5 font-serif text-[clamp(46px,5vw,82px)] font-black leading-[0.92] text-white drop-shadow-[0_8px_18px_rgba(0,0,0,0.7)]">
+                  Günlük<br />İndirim Paketi
+                </h2>
+                <p className="mt-5 max-w-sm text-xl font-bold leading-snug text-sky-100/90">
+                  Her girişte önerilen başlangıç paketi. Yüksek çip, net fiyat, gerçek indirim.
+                </p>
+                <div className="mt-7 flex flex-wrap items-center gap-3 text-sm font-black text-white/78">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2"><CipSimgesi boyut="sm" /> {gunlukIndirimPaketi.cipYazi} Çip</span>
+                  <span className="rounded-full bg-white/10 px-3 py-2">Günde 1 kez</span>
+                  <span className="rounded-full bg-pink-500/90 px-3 py-2">%{gunlukIndirimPaketi.indirimOrani} indirim</span>
+                </div>
+              </section>
+
+              <section className="daily-deal-visual relative flex h-full items-center justify-center">
+                <div className="absolute top-12 z-20 rotate-[-7deg] rounded-full border-4 border-yellow-100 bg-gradient-to-r from-pink-500 to-orange-500 px-6 py-2 text-3xl font-black text-white shadow-[0_16px_30px_rgba(236,72,153,0.45)]">
+                  %{gunlukIndirimPaketi.indirimOrani}
+                </div>
+
+                <div className="relative h-[420px] w-[540px] max-w-full">
+                  <div className="absolute left-8 top-40 h-40 w-[420px] rotate-[-8deg] rounded-[34px] bg-gradient-to-br from-pink-300 via-fuchsia-500 to-purple-900 shadow-[0_30px_70px_rgba(0,0,0,0.52)]"></div>
+                  <div className="absolute left-[330px] top-[250px] h-24 w-48 rotate-[12deg] rounded-[20px] bg-gradient-to-br from-emerald-200 to-teal-500 shadow-2xl"></div>
+                  <div className="absolute left-[354px] top-[268px] z-20 rotate-[12deg] text-center text-white drop-shadow">
+                    <div className="text-sm font-black line-through opacity-70">{gunlukIndirimPaketi.normalFiyat}</div>
+                    <div className="text-5xl font-black">{gunlukIndirimPaketi.fiyat}</div>
+                  </div>
+
+                  <div className="absolute left-[74px] top-[112px] h-[232px] w-[320px] rotate-[-6deg] rounded-[32px] bg-gradient-to-br from-blue-300 via-blue-500 to-indigo-900 shadow-[0_35px_74px_rgba(0,0,0,0.62)]">
+                    <div className="absolute inset-x-0 top-0 h-20 rounded-t-[32px] bg-gradient-to-br from-sky-200 via-blue-400 to-indigo-500"></div>
+                    <div className="absolute left-1/2 top-0 h-full w-11 -translate-x-1/2 bg-gradient-to-b from-fuchsia-100 via-pink-400 to-purple-800"></div>
+                    <div className="absolute -left-9 top-28 h-20 w-[385px] rounded-[24px] bg-gradient-to-r from-sky-200 via-blue-500 to-indigo-900 shadow-xl"></div>
+                    <div className="absolute left-5 top-4 text-5xl opacity-25">✦ ✦ ✦</div>
+                    {Array.from({ length: 24 }).map((_, index) => (
+                      <span
+                        key={index}
+                        className="absolute flex h-12 w-12 items-center justify-center rounded-full border-2 border-yellow-100 bg-gradient-to-br from-yellow-200 via-yellow-400 to-orange-500 text-[12px] font-black text-yellow-900 shadow-[0_8px_14px_rgba(0,0,0,0.25)]"
+                        style={{
+                          left: `${34 + (index % 8) * 30 + (index % 3) * 7}px`,
+                          top: `${-28 + Math.floor(index / 8) * 36 + (index % 2) * 8}px`,
+                          transform: `rotate(${(index % 5) * 11 - 18}deg)`,
+                          zIndex: 8 + index,
+                        }}
+                      >
+                        101
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="absolute right-10 top-[352px] z-20 rotate-[13deg] rounded-[22px] border-4 border-yellow-100 bg-gradient-to-r from-yellow-50 to-amber-200 px-7 py-4 text-center text-amber-900 shadow-2xl">
+                    <div className="text-4xl font-black">{gunlukIndirimPaketi.cipYazi}</div>
+                    <div className="text-lg font-black">Çip</div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="daily-deal-summary self-end pb-8">
+                <div className="rounded-[28px] border border-white/20 bg-white/10 p-5 shadow-2xl backdrop-blur-md">
+                  <div className="text-sm font-black uppercase text-yellow-200">Paket İçeriği</div>
+                  <div className="mt-3 space-y-2 text-sm font-bold text-white/85">
+                    <div className="flex items-center justify-between rounded-2xl bg-black/25 px-4 py-3"><span>Çip</span><span className="text-yellow-200">{gunlukIndirimPaketi.cipYazi}</span></div>
+                    <div className="flex items-center justify-between rounded-2xl bg-black/25 px-4 py-3"><span>Normal</span><span className="line-through opacity-70">{gunlukIndirimPaketi.normalFiyat}</span></div>
+                    <div className="flex items-center justify-between rounded-2xl bg-black/25 px-4 py-3"><span>Bugün</span><span className="text-emerald-200">{gunlukIndirimPaketi.fiyat}</span></div>
+                  </div>
+                  <button onClick={kampanyaCipSatinAl} className="mt-5 w-full rounded-2xl bg-gradient-to-r from-yellow-300 to-orange-500 py-4 text-xl font-black text-white shadow-[0_18px_30px_rgba(249,115,22,0.35)] hover:brightness-110 active:scale-95">
+                    {gunlukIndirimPaketi.fiyat} ile Al
+                  </button>
+                  <button onClick={() => setKampanyaAcik(false)} className="mt-3 w-full rounded-2xl bg-white/10 py-3 text-sm font-black text-white/75 hover:bg-white/15">Sonra Bak</button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {false && kampanyaAcik && (
         <div className="fixed inset-0 z-[9500] flex items-center justify-center overflow-hidden bg-black/72 p-4 backdrop-blur-[2px]" onClick={() => setKampanyaAcik(false)}>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,214,102,0.18),transparent_28%),radial-gradient(circle_at_78%_38%,rgba(79,172,254,0.18),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.08)_0_1px,transparent_1px_18px)]"></div>
-          <div className="relative h-[min(640px,88vh)] w-[min(1180px,96vw)] overflow-hidden rounded-[34px] border border-white/20 bg-gradient-to-br from-[#15101f] via-[#1f2144] to-[#0c1327] shadow-[0_40px_100px_rgba(0,0,0,0.7)]" onClick={(e)=>e.stopPropagation()}>
+          <div className="relative z-10 w-[min(390px,92vw)] max-h-[calc(100svh-28px)] overflow-hidden rounded-[28px] border border-white/20 bg-gradient-to-br from-[#15101f] via-[#1f2144] to-[#0c1327] p-5 shadow-[0_28px_70px_rgba(0,0,0,0.7)] md:hidden" onClick={(e)=>e.stopPropagation()}>
+            <div className="absolute inset-0 opacity-80 bg-[radial-gradient(circle_at_24%_24%,rgba(255,246,196,0.24),transparent_26%),radial-gradient(circle_at_76%_30%,rgba(255,64,129,0.2),transparent_24%),radial-gradient(circle_at_30%_86%,rgba(34,211,238,0.16),transparent_30%)]"></div>
+            <button onClick={() => setKampanyaAcik(false)} className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/45 bg-black/30 text-3xl font-light leading-none text-white shadow-[0_0_18px_rgba(255,255,255,0.2)]">×</button>
+            <div className="relative z-10">
+              <div className="inline-flex rounded-full border border-cyan-200/40 bg-cyan-300/15 px-3 py-1 text-[11px] font-black uppercase text-cyan-100 shadow">
+                Sadece Bugün
+              </div>
+              <h2 className="mt-4 font-serif text-[40px] font-black leading-[0.92] text-white drop-shadow-[0_8px_18px_rgba(0,0,0,0.65)]">
+                Günlük<br />İndirim
+              </h2>
+              <p className="mt-3 max-w-[260px] text-sm font-bold leading-snug text-sky-100/88">
+                100.000 çiplik başlangıç paketi bugün 10 TL.
+              </p>
+
+              <div className="relative mx-auto mt-4 h-40 w-full max-w-[310px]">
+                <div className="absolute left-1/2 top-10 h-24 w-44 -translate-x-1/2 rotate-[-7deg] rounded-[24px] bg-gradient-to-br from-blue-300 via-blue-500 to-indigo-800 shadow-[0_22px_42px_rgba(0,0,0,0.48)]">
+                  <div className="absolute inset-x-0 top-0 h-9 rounded-t-[24px] bg-gradient-to-br from-sky-200 via-blue-400 to-indigo-500"></div>
+                  <div className="absolute left-1/2 top-0 h-full w-6 -translate-x-1/2 bg-gradient-to-b from-fuchsia-200 via-pink-400 to-purple-700"></div>
+                  <div className="absolute -left-5 top-12 h-9 w-[215px] rounded-[16px] bg-gradient-to-r from-sky-200 via-blue-500 to-indigo-900 shadow-lg"></div>
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <span
+                      key={i}
+                      className="absolute flex h-8 w-8 items-center justify-center rounded-full border border-yellow-100 bg-gradient-to-br from-yellow-200 via-yellow-400 to-orange-500 text-[10px] font-black text-yellow-900 shadow"
+                      style={{
+                        left: `${12 + (i % 6) * 25}px`,
+                        top: `${-22 + Math.floor(i / 6) * 26 + (i % 2) * 5}px`,
+                        transform: `rotate(${(i % 5) * 10 - 18}deg)`,
+                        zIndex: 8 + i,
+                      }}
+                    >
+                      101
+                    </span>
+                  ))}
+                </div>
+                <div className="absolute right-3 top-3 rotate-[8deg] rounded-2xl bg-pink-500 px-4 py-1.5 text-lg font-black text-white shadow-lg">%50</div>
+                <div className="absolute bottom-2 left-3 rounded-2xl border border-yellow-100/70 bg-white/90 px-4 py-3 text-center text-amber-900 shadow-xl">
+                  <div className="text-2xl font-black">100.000</div>
+                  <div className="text-xs font-black">Çip</div>
+                </div>
+                <div className="absolute bottom-1 right-4 rotate-[-5deg] rounded-2xl bg-gradient-to-r from-lime-300 to-emerald-400 px-5 py-3 text-center text-emerald-950 shadow-xl">
+                  <div className="text-[10px] font-black line-through opacity-60">19,99 TL</div>
+                  <div className="text-2xl font-black">10 TL</div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-black text-white/85">
+                <div className="rounded-2xl bg-white/10 px-3 py-3"><div className="text-white/55">Paket</div><div className="mt-1 flex items-center gap-1.5 text-yellow-200"><CipSimgesi boyut="xs" /> 100.000 Çip</div></div>
+                <div className="rounded-2xl bg-white/10 px-3 py-3"><div className="text-white/55">Hak</div><div className="mt-1 text-cyan-100">Günde 1 kez</div></div>
+              </div>
+              <button onClick={kampanyaCipSatinAl} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-yellow-300 to-orange-500 py-3.5 text-lg font-black text-white shadow-[0_16px_28px_rgba(249,115,22,0.35)] active:scale-95">
+                10 TL ile Al
+              </button>
+              <button onClick={() => setKampanyaAcik(false)} className="mt-2 w-full rounded-2xl bg-white/10 py-3 text-xs font-black text-white/75">Sonra Bak</button>
+            </div>
+          </div>
+
+          <div className="relative hidden h-[min(640px,88vh)] w-[min(1180px,96vw)] overflow-hidden rounded-[34px] border border-white/20 bg-gradient-to-br from-[#15101f] via-[#1f2144] to-[#0c1327] shadow-[0_40px_100px_rgba(0,0,0,0.7)] md:block" onClick={(e)=>e.stopPropagation()}>
             <div className="absolute inset-0 opacity-80 bg-[radial-gradient(circle_at_42%_42%,rgba(255,246,196,0.22),transparent_26%),radial-gradient(circle_at_68%_22%,rgba(255,64,129,0.18),transparent_20%),radial-gradient(circle_at_22%_75%,rgba(34,211,238,0.14),transparent_28%)]"></div>
             <div className="absolute -left-20 -top-24 h-72 w-72 rounded-full bg-yellow-300/20 blur-3xl"></div>
             <div className="absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-cyan-300/20 blur-3xl"></div>
@@ -2120,7 +2444,7 @@ export default function LoungeApp() {
               </div>
 
               <div className="relative flex h-full items-center justify-center">
-                <div className="absolute top-14 rounded-full bg-pink-500 px-5 py-2 text-2xl font-black text-white shadow-[0_12px_28px_rgba(236,72,153,0.45)] rotate-[-8deg]">%167</div>
+                <div className="absolute top-14 rounded-full bg-pink-500 px-5 py-2 text-2xl font-black text-white shadow-[0_12px_28px_rgba(236,72,153,0.45)] rotate-[-8deg]">%50</div>
                 <div className="relative h-[390px] w-[520px] max-w-full">
                   <div className="absolute left-10 top-32 h-40 w-[410px] rotate-[-8deg] rounded-[32px] bg-gradient-to-br from-pink-300 via-fuchsia-400 to-purple-800 shadow-[0_28px_60px_rgba(0,0,0,0.5)]"></div>
                   <div className="absolute left-72 top-52 h-24 w-44 rotate-[12deg] rounded-[18px] bg-gradient-to-br from-emerald-300 to-teal-500 shadow-2xl"></div>
@@ -2277,7 +2601,7 @@ export default function LoungeApp() {
 
       {gunlukGirisAcik && (
         <div className="fixed inset-0 z-[9550] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-[1120px] max-w-[96vw] rounded-[34px] overflow-hidden bg-gradient-to-br from-indigo-950 via-violet-900 to-slate-950 border-4 border-white/20 shadow-[0_0_90px_rgba(129,140,248,0.5)] text-slate-900" onClick={(e) => e.stopPropagation()}>
+          <div className="weekly-reward-modal w-[1120px] max-w-[96vw] rounded-[34px] overflow-hidden bg-gradient-to-br from-indigo-950 via-violet-900 to-slate-950 border-4 border-white/20 shadow-[0_0_90px_rgba(129,140,248,0.5)] text-slate-900" onClick={(e) => e.stopPropagation()}>
             <div className="relative min-h-24 bg-gradient-to-r from-indigo-700 via-fuchsia-600 to-amber-400 flex items-center justify-between px-7 text-white overflow-hidden">
               <div className="pointer-events-none absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_20%_35%,white,transparent_18%),radial-gradient(circle_at_72%_25%,white,transparent_14%)]"></div>
               <div className="relative flex items-center gap-4">
@@ -2291,7 +2615,7 @@ export default function LoungeApp() {
             </div>
 
             <div className="relative p-6">
-              <div className="grid grid-cols-7 gap-3">
+              <div className="weekly-reward-grid grid grid-cols-7 gap-3">
                 {haftalikOduller.map((odul) => {
                   const bugun = odul.gun === mevcutGirisGunu;
                   const alindi = gunlukOdulAlindi ? odul.gun <= mevcutGirisGunu : odul.gun < mevcutGirisGunu;
@@ -2402,14 +2726,14 @@ export default function LoungeApp() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <div onClick={() => { setSonucPaneli(null); setOkeyProfilIndex(0); setOkeyProfilAcik(true); }} className="flex items-center rounded-2xl bg-yellow-400/25 border border-yellow-200/50 px-4 py-3 text-white font-black cursor-pointer hover:bg-yellow-300/35 transition-all">
+                    <div onClick={() => { setSonucPaneli(null); oyunProfiliniAc(0); }} className="flex items-center rounded-2xl bg-yellow-400/25 border border-yellow-200/50 px-4 py-3 text-white font-black cursor-pointer hover:bg-yellow-300/35 transition-all">
                       <div className="w-12 h-12 rounded-full bg-white/30 border border-white/40 flex items-center justify-center mr-3">🦅</div>
                       <div className="flex-1">{isim || 'Süleyman'}</div>
                       <div className="w-16 text-center">{sonucPaneli.puan}</div>
                       <div className="w-32 text-right text-yellow-200 inline-flex items-center justify-end gap-1.5"><CipSimgesi boyut="sm" /> {sonucPaneli.cip.toLocaleString()}</div>
                     </div>
                     {sonucPaneli.rakipler.map((r, i) => (
-                      <div key={r.isim} onClick={() => { setSonucPaneli(null); setOkeyProfilIndex(i + 1); setOkeyProfilAcik(true); }} className="flex items-center rounded-2xl bg-black/18 border border-white/15 px-4 py-3 text-white/90 font-bold cursor-pointer hover:bg-white/15 transition-all">
+                      <div key={r.isim} onClick={() => { setSonucPaneli(null); oyunProfiliniAc(i + 1); }} className="flex items-center rounded-2xl bg-black/18 border border-white/15 px-4 py-3 text-white/90 font-bold cursor-pointer hover:bg-white/15 transition-all">
                         <div className="w-10 h-10 rounded-full bg-white/25 flex items-center justify-center mr-3">{i+2}</div>
                         <div className="flex-1">{r.isim}</div>
                         <button onClick={(e) => e.stopPropagation()} className="mr-4 rounded-lg bg-white/25 px-3 py-1 text-xs hover:bg-white/35">☆ Takip et</button>
@@ -2467,14 +2791,15 @@ export default function LoungeApp() {
       `}} />
 
       {/* ÜST BAR PANELİ */}
-      <div className="flex justify-between items-center bg-black/40 backdrop-blur-md p-2 px-4 rounded-xl border border-white/10 shadow-lg z-10">
+      <div className="lounge-topbar flex justify-between items-center bg-black/40 backdrop-blur-md p-2 px-4 rounded-xl border border-white/10 shadow-lg z-10">
         <div className="flex items-center gap-3">
-          <button onClick={() => setProfilModalAcik(true)} className={`w-14 h-14 rounded-full flex items-center justify-center font-bold bg-slate-800 relative overflow-visible hover:scale-105 transition-transform ${cerceveRengiGetir(vipSeviyesi)}`}>
+          <button onClick={() => setProfilModalAcik(true)} className={`w-14 h-14 rounded-full flex items-center justify-center font-bold bg-slate-800 relative overflow-visible hover:scale-105 transition-transform ${aktifProfilDekoru?.cerceve || cerceveRengiGetir(vipSeviyesi)}`}>
             {profilAvatar.startsWith('data:') ? (
               <img src={profilAvatar} alt="profil" className="w-full h-full object-cover rounded-full" />
             ) : (
               <span className="text-2xl">{profilAvatar}</span>
             )}
+            {aktifProfilDekoru && <span className="pointer-events-none absolute -right-2 -top-2 text-xl drop-shadow">{aktifProfilDekoru.ikon}</span>}
             {vipSeviyesi > 0 && (
               <span className="absolute -top-2 -right-5 px-2 py-1 rounded-tl-xl rounded-br-xl bg-gradient-to-b from-red-500 via-orange-500 to-yellow-400 text-white text-[10px] font-black border-2 border-yellow-200 shadow-[0_0_12px_rgba(251,191,36,0.75)] rotate-[-5deg]">👑 VIP{vipSeviyesi}</span>
             )}
@@ -2483,12 +2808,27 @@ export default function LoungeApp() {
             <div className="font-bold text-sm flex items-center gap-1.5 drop-shadow-md">{isim} {vipSeviyesi > 0 && <span>{tacEmojisiGetir(vipSeviyesi)}</span>}</div>
             <div className="flex items-center gap-2 text-xs mt-0.5">
               <button onClick={() => { setMagazaAktifSekme('çipler'); setVipMarketAcik(true); setCantaAcik(false); setArkadaslarAcik(false); setGelenKutusuAcik(false); }} className="inline-flex items-center gap-1.5 text-yellow-400 font-bold bg-black/50 px-2 py-0.5 rounded border border-yellow-600/50 shadow-sm hover:bg-yellow-950/70"><CipSimgesi boyut="xs" /> {bakiyeCip.toLocaleString()}</button>
-              <button onClick={elmasDonustur} title="50.000 çip = 1 elmas" className="text-cyan-400 font-bold bg-black/50 px-2 py-0.5 rounded border border-cyan-600/50 shadow-sm hover:bg-cyan-950/70">💎 {bakiyeElmas.toFixed(1)}</button>
+              <button onClick={elmasDonustur} title="50.000 çip = 1 elmas" className="inline-flex items-center gap-1.5 text-cyan-300 font-bold bg-black/50 px-2 py-0.5 rounded border border-cyan-600/50 shadow-sm hover:bg-cyan-950/70"><ElmasSimgesi boyut="xs" /> {bakiyeElmas.toFixed(1)}</button>
             </div>
           </div>
         </div>
         
         <div className="flex gap-2 items-center">
+          <button
+            onClick={() => {
+              setKampanyaAcik(true);
+              setVipMarketAcik(false);
+              setCantaAcik(false);
+              setArkadaslarAcik(false);
+              setBegeniPaneliAcik(false);
+              setHediyeCipPanelAcik(false);
+              setSiralamaAcik(false);
+            }}
+            className="discount-top-button relative overflow-hidden rounded-xl border border-cyan-200/50 bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-orange-500 px-3 py-1.5 text-xs font-black text-white shadow-[0_10px_24px_rgba(236,72,153,0.35)] hover:brightness-110 active:scale-95"
+          >
+            <span className="absolute right-1 top-0 rounded-full bg-red-500 px-1.5 py-0.5 text-[8px] font-black leading-none">%{gunlukIndirimPaketi.indirimOrani}</span>
+            <span className="relative pr-6">Günün Teklifi</span>
+          </button>
           <button onClick={() => { setGunlukGirisAcik(true); setVipMarketAcik(false); setCantaAcik(false); setArkadaslarAcik(false); setBegeniPaneliAcik(false); setHediyeCipPanelAcik(false); setSiralamaAcik(false); }} className="bg-gradient-to-r from-red-600 to-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold border border-orange-500 hover:brightness-110 shadow-md">📅 Ödüller</button>
           <button onClick={toggleGelenKutusu} className="bg-black/40 border border-white/10 hover:bg-black/60 p-2 rounded-lg relative text-xs cursor-pointer shadow-md">
             ✉️ {mesajlar.filter(m=>!m.alindi).length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(220,38,38,0.8)]"></span>}
@@ -2500,7 +2840,7 @@ export default function LoungeApp() {
       {/* KENDİ PROFİL PANELİ — profil, gönderiler, başarılar ve düzenleme ekranları */}
       {profilModalAcik && (
         <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/65 backdrop-blur-sm" onClick={() => { setProfilModalAcik(false); setAvatarSecimAcik(false); setProfilDuzenleme(null); }}>
-          <div className="w-[960px] max-w-[95vw] max-h-[92vh] rounded-[24px] overflow-hidden bg-gradient-to-b from-blue-50 via-white to-sky-100 border-4 border-sky-200 shadow-[0_0_80px_rgba(96,165,250,0.65)] relative" onClick={(e) => e.stopPropagation()}>
+          <div className="profile-modal w-[960px] max-w-[95vw] max-h-[92vh] rounded-[24px] overflow-hidden bg-gradient-to-b from-blue-50 via-white to-sky-100 border-4 border-sky-200 shadow-[0_0_80px_rgba(96,165,250,0.65)] relative" onClick={(e) => e.stopPropagation()}>
             <div className="h-16 bg-gradient-to-r from-sky-400 via-blue-300 to-sky-300 flex items-center text-white font-black text-2xl relative">
               <button onClick={() => setProfilSekme('profil')} className={`px-10 h-full flex items-center gap-2 rounded-br-[26px] transition ${profilSekme === 'profil' ? 'bg-gradient-to-r from-yellow-400 to-orange-400 shadow-lg' : 'text-blue-900/70 hover:bg-white/20'}`}>👤 Profil</button>
               <button onClick={() => setProfilSekme('gonderiler')} className={`px-10 h-full flex items-center gap-2 transition ${profilSekme === 'gonderiler' ? 'bg-gradient-to-r from-yellow-400 to-orange-400 shadow-lg rounded-b-[22px]' : 'text-blue-900/70 hover:bg-white/20'}`}>▦ Gönderiler</button>
@@ -2512,7 +2852,8 @@ export default function LoungeApp() {
               <div className="p-6 grid grid-cols-[240px_1fr] gap-7">
                 <div className="flex flex-col items-center relative">
                   <div className="absolute -left-8 top-6 h-52 w-10 rounded-full bg-gradient-to-b from-yellow-200 via-white to-slate-300 border border-white/70 shadow-xl flex items-center justify-center text-3xl rotate-[-8deg]">🎣</div>
-                  <div className="relative w-36 h-36 rounded-3xl bg-gradient-to-br from-amber-200 to-orange-500 border-4 border-white shadow-xl flex items-center justify-center overflow-hidden">
+                  <div className={`relative w-36 h-36 rounded-3xl bg-gradient-to-br from-amber-200 to-orange-500 border-4 border-white shadow-xl flex items-center justify-center overflow-visible ${aktifProfilDekoru?.cerceve || ""}`}>
+                    {aktifProfilDekoru && <span className="pointer-events-none absolute -right-3 -top-3 z-20 text-4xl drop-shadow">{aktifProfilDekoru.ikon}</span>}
                     {profilAvatar.startsWith('data:') ? <img src={profilAvatar} alt="profil" className="w-full h-full object-cover" /> : <span className="text-6xl">{profilAvatar}</span>}
                     {vipSeviyesi > 0 && <div className="absolute -bottom-1 -right-1 bg-gradient-to-b from-red-500 to-yellow-400 text-white text-xs font-black px-2 py-1 rounded-tl-xl border border-yellow-100">VIP{vipSeviyesi}</div>}
                   </div>
@@ -2525,7 +2866,7 @@ export default function LoungeApp() {
                     <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><span className="text-2xl">{profilCinsiyet === 'Erkek' ? '♂️' : '♀️'}</span><span className="font-black text-blue-800">{isim || profilIsimTaslak}</span><button onClick={() => { setProfilIsimTaslak(isim || profilIsimTaslak); setProfilDuzenleme('isim'); }} className="ml-auto rounded-lg bg-white/70 px-2 py-1 text-sky-600 font-black">✎</button></div>
                     <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><CipSimgesi boyut="md" /><span className="font-black text-blue-800">{bakiyeCip.toLocaleString()}</span><button onClick={() => { setProfilModalAcik(false); setMagazaAktifSekme('çipler'); setVipMarketAcik(true); setCantaAcik(false); setArkadaslarAcik(false); setGelenKutusuAcik(false); }} className="ml-auto rounded-lg bg-white/70 px-2 py-1 text-sky-600 font-black hover:bg-yellow-100">＋</button></div>
                     <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><span className="text-2xl">📍</span><span className="font-black text-blue-800">{profilKonumGizlilik === 'Sadece ben' ? 'Gizli' : profilSehir}</span><button onClick={() => setProfilDuzenleme('konum')} className="ml-auto rounded-lg bg-white/70 px-2 py-1 text-sky-600 font-black">✎</button></div>
-                    <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><span className="text-2xl">💎</span><span className="font-black text-blue-800">{bakiyeElmas.toFixed(1)}</span><button onClick={elmasDonustur} title="50.000 çip = 1 elmas" className="ml-auto rounded-lg bg-white/70 px-2 py-1 text-sky-600 font-black hover:bg-cyan-100">＋</button></div>
+                    <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><ElmasSimgesi boyut="md" /><span className="font-black text-blue-800">{bakiyeElmas.toFixed(1)}</span><button onClick={elmasDonustur} title="50.000 çip = 1 elmas" className="ml-auto rounded-lg bg-white/70 px-2 py-1 text-sky-600 font-black hover:bg-cyan-100">＋</button></div>
                   </div>
                   <div className="grid grid-cols-4 gap-3 mb-5">
                     <div className="rounded-2xl bg-white/85 border border-sky-200 p-3 text-center"><div className="text-xs text-sky-700 font-black">Oynanan oyun</div><div className="text-2xl text-blue-800 font-black">1465</div></div>
@@ -2621,14 +2962,14 @@ export default function LoungeApp() {
       )}
 
       {/* ANA OYUN VE DASHBOARD */}
-      <div className="flex-1 flex justify-between gap-4 my-3 items-center w-full relative h-[85%]">
+      <div className="lounge-dashboard flex-1 flex justify-between gap-4 my-3 items-center w-full relative h-[85%]">
         
         {/* ======================================================== */}
         {/* SOL: DAR SIRALAMA ŞERİDİ                                 */}
         {/* ======================================================== */}
         <div 
           onClick={toggleSiralamaPanel} 
-          className="w-[74px] flex flex-col items-center cursor-pointer transition-all z-10 h-[82%] mt-auto mb-auto bg-black/25 backdrop-blur-[2px] rounded-xl border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.28)] overflow-hidden py-2"
+          className="lounge-rank-strip w-[74px] flex flex-col items-center cursor-pointer transition-all z-10 h-[82%] mt-auto mb-auto bg-black/25 backdrop-blur-[2px] rounded-xl border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.28)] overflow-hidden py-2"
         >
           <div className="bg-gradient-to-r from-blue-500 to-blue-700 w-[88%] py-1.5 rounded-sm text-center shadow-md mb-2 border border-blue-300/50">
             <span className="text-[9px] font-black tracking-wide text-white drop-shadow-md">SIRALAMA</span>
@@ -2655,7 +2996,7 @@ export default function LoungeApp() {
         {/* ======================================================== */}
         {/* ORTA: LOBİ MASKOTU VE OKEY VİTRİNİ — sade, parlak       */}
         {/* ======================================================== */}
-        <div className="absolute left-[230px] top-12 bottom-8 w-[360px] z-0 pointer-events-none flex flex-col justify-center items-center">
+        <div className="lounge-hero absolute left-[230px] top-12 bottom-8 w-[360px] z-0 pointer-events-none flex flex-col justify-center items-center">
           <div className="relative w-[300px] h-[470px] rounded-[36px] bg-gradient-to-b from-white/28 via-white/12 to-transparent border border-white/35 shadow-[0_20px_70px_rgba(120,70,20,0.28)] overflow-hidden">
             <div className="absolute inset-x-8 top-6 h-24 rounded-full bg-white/35 blur-2xl"></div>
             <div className="absolute left-1/2 top-10 -translate-x-1/2 text-[82px] drop-shadow-[0_10px_22px_rgba(0,0,0,0.22)]">🃏</div>
@@ -2673,7 +3014,7 @@ export default function LoungeApp() {
         {/* ======================================================== */}
         {/* SAĞ: GRID MENÜ MASALARI (CAM EFEKTLİ LÜKS YAPI)          */}
         {/* ======================================================== */}
-        <div className="w-[480px] grid grid-cols-3 gap-2.5 content-center z-10 h-full">
+        <div className="lounge-menu-grid w-[480px] grid grid-cols-3 gap-2.5 content-center z-10 h-full">
           <button onClick={() => setOtomatikOkeyAcik(true)} className="col-span-3 bg-gradient-to-r from-orange-500/90 via-amber-500/90 to-yellow-500/90 backdrop-blur-sm p-4 rounded-xl flex justify-between items-center group border border-yellow-400/50 shadow-xl hover:brightness-110 transition-all">
             <div className="text-left"><span className="text-[10px] block font-black text-orange-950 uppercase tracking-widest">101 OKEY</span><h3 className="text-lg font-black text-white tracking-wide mt-0.5 drop-shadow-md">Otomatik Eşleşme</h3></div>
             <span className="text-4xl drop-shadow-lg">🀄</span>
@@ -2724,7 +3065,7 @@ export default function LoungeApp() {
       </div>
 
       {/* LOBİ CANLI SOHBET AKIŞI — küçük, kibar ve tıklayınca sohbeti açar */}
-      <button onClick={() => setLobiSohbetAcik(true)} className="absolute left-7 bottom-[72px] z-30 w-[230px] text-left group">
+      <button onClick={() => setLobiSohbetAcik(true)} className="lounge-chat-preview absolute left-7 bottom-[72px] z-30 w-[230px] text-left group">
         <div className="rounded-md bg-black/42 backdrop-blur-[1px] border-l-2 border-blue-400 px-2.5 py-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.22)] group-hover:bg-black/56 transition-all">
           {(gonderiler.length ? gonderiler.slice(0, 2) : [
             { id: 991, isim: 'Melis', vip: 0, metin: '[Çıkartmalar]' },
@@ -2738,8 +3079,8 @@ export default function LoungeApp() {
       </button>
 
       {lobiSohbetAcik && (
-        <div className="absolute inset-0 z-[95] bg-black/45 backdrop-blur-sm flex items-center justify-start pl-10" onClick={() => setLobiSohbetAcik(false)}>
-          <div className="w-[500px] h-[540px] max-h-[86vh] rounded-3xl overflow-hidden bg-gradient-to-b from-blue-300/95 to-sky-100/95 border-2 border-white/70 shadow-[0_22px_70px_rgba(0,0,0,0.35)] flex flex-col" onClick={(e)=>e.stopPropagation()}>
+        <div className="lounge-chat-modal absolute inset-0 z-[95] bg-black/45 backdrop-blur-sm flex items-center justify-start pl-10" onClick={() => setLobiSohbetAcik(false)}>
+          <div className="lounge-chat-card w-[500px] h-[540px] max-h-[86vh] rounded-3xl overflow-hidden bg-gradient-to-b from-blue-300/95 to-sky-100/95 border-2 border-white/70 shadow-[0_22px_70px_rgba(0,0,0,0.35)] flex flex-col" onClick={(e)=>e.stopPropagation()}>
             <div className="h-12 shrink-0 bg-gradient-to-r from-blue-500 to-sky-400 flex items-center justify-between px-5 text-white font-black text-lg">
               <span>💬 Sohbet Odası</span><button onClick={()=>setLobiSohbetAcik(false)} className="w-9 h-9 rounded-full bg-white/25 text-3xl leading-none">×</button>
             </div>
@@ -2767,7 +3108,7 @@ export default function LoungeApp() {
       )}
 
       {/* EN ALT MENÜ BAR PANELİ */}
-      <div className="w-full bg-black/60 backdrop-blur-lg p-2.5 rounded-xl border border-white/10 flex justify-between items-center shadow-2xl z-10">
+      <div className="lounge-bottom-nav w-full bg-black/60 backdrop-blur-lg p-2.5 rounded-xl border border-white/10 flex justify-between items-center shadow-2xl z-10">
         <div className="text-[10px] text-gray-400 font-medium tracking-wide drop-shadow">LOUNGE 101 CLUB v2.0</div>
         <div className="flex gap-2">
           <button onClick={() => { setCantaAcik(!cantaAcik); setVipMarketAcik(false); setArkadaslarAcik(false); setBegeniPaneliAcik(false); setHediyeCipPanelAcik(false); setSiralamaAcik(false); }} className="bg-black/60 border border-white/20 px-4 py-2 rounded-xl text-xs font-black text-gray-200 hover:bg-black/80 transition-all shadow-md">💼 Çanta</button>
@@ -2783,7 +3124,7 @@ export default function LoungeApp() {
       {/* ======================================================== */}
       {siralamaAcik && (
         <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-[80] backdrop-blur-md">
-          <div className="w-[850px] h-[520px] bg-blue-50 rounded-3xl flex overflow-hidden shadow-[0_0_50px_rgba(59,130,246,0.3)] animate-fade-in relative border border-white">
+          <div className="leaderboard-modal w-[850px] h-[520px] bg-blue-50 rounded-3xl flex overflow-hidden shadow-[0_0_50px_rgba(59,130,246,0.3)] animate-fade-in relative border border-white">
             
             <button onClick={() => setSiralamaAcik(false)} className="absolute top-4 right-4 text-blue-900 hover:bg-white/50 font-black text-lg z-50 bg-white/80 w-8 h-8 rounded-full flex items-center justify-center border border-blue-200 shadow-sm transition-all">✕</button>
 
@@ -2883,9 +3224,9 @@ export default function LoungeApp() {
               <button onClick={() => setHediyePaneliAcik(false)} className="bg-white/20 hover:bg-white/30 rounded-full w-7 h-7 flex items-center justify-center font-black">✕</button>
             </div>
             <div className="flex bg-gray-200 text-gray-500 font-bold text-xs">
-              <button onClick={() => { setHediyeSekmesi("elmas"); setSeciliHediyeId(1); }} className={`px-5 py-2.5 rounded-tr-2xl transition-all ${hediyeSekmesi === "elmas" ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-white shadow-md" : "hover:bg-gray-300"}`}>💎 Elmas Ödülü</button>
+              <button onClick={() => { setHediyeSekmesi("elmas"); setSeciliHediyeId(1); }} className={`inline-flex items-center gap-1.5 px-5 py-2.5 rounded-tr-2xl transition-all ${hediyeSekmesi === "elmas" ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-white shadow-md" : "hover:bg-gray-300"}`}><ElmasSimgesi boyut="sm" /> Elmas Ödülü</button>
               <button onClick={() => { setHediyeSekmesi("klan"); setSeciliHediyeId(1); }} className={`px-5 py-2.5 rounded-tr-2xl transition-all ${hediyeSekmesi === "klan" ? "bg-gradient-to-r from-cyan-400 to-blue-500 text-white shadow-md" : "hover:bg-gray-300"}`}>🛡️ Klan Çipi Ödülü</button>
-              <div className="ml-auto px-4 py-2 flex items-center gap-1.5 bg-white/50 text-indigo-900 rounded-bl-xl font-black"><span className="text-cyan-500 text-lg">💎</span> {bakiyeElmas.toFixed(1)}</div>
+              <div className="ml-auto px-4 py-2 flex items-center gap-1.5 bg-white/50 text-indigo-900 rounded-bl-xl font-black"><ElmasSimgesi boyut="sm" /> {bakiyeElmas.toFixed(1)}</div>
             </div>
             <div className="p-4 bg-blue-50/50">
               <div className="grid grid-cols-5 gap-3">
@@ -2900,7 +3241,7 @@ export default function LoungeApp() {
                         {h.envanterAdet > 0 ? (
                           <div className="bg-amber-400 text-white text-[9px] font-black py-1 w-full text-center tracking-wide">Envanter: {h.envanterAdet}</div>
                         ) : (
-                          <div className="bg-blue-50 text-indigo-600 text-[10px] font-black py-1 w-full flex items-center justify-center gap-1"><span className="text-[10px]">💎</span> {h.maliyet}</div>
+                          <div className="bg-blue-50 text-indigo-600 text-[10px] font-black py-1 w-full flex items-center justify-center gap-1"><ElmasSimgesi boyut="xs" /> {h.maliyet}</div>
                         )}
                       </div>
                     </button>
@@ -2943,7 +3284,7 @@ export default function LoungeApp() {
 
       {arkadaslarAcik && (
         <div className="absolute inset-0 bg-blue-950/35 backdrop-blur-sm flex items-center justify-center z-[90]" onClick={() => setArkadaslarAcik(false)}>
-          <div className="w-[860px] h-[560px] rounded-3xl overflow-hidden bg-gradient-to-br from-blue-400 via-sky-300 to-cyan-100 border-2 border-white/60 shadow-[0_25px_80px_rgba(0,0,0,0.35)] flex" onClick={(e)=>e.stopPropagation()}>
+          <div className="friends-modal w-[860px] h-[560px] rounded-3xl overflow-hidden bg-gradient-to-br from-blue-400 via-sky-300 to-cyan-100 border-2 border-white/60 shadow-[0_25px_80px_rgba(0,0,0,0.35)] flex" onClick={(e)=>e.stopPropagation()}>
             <div className="w-48 bg-gradient-to-b from-blue-600 to-blue-900 text-white p-5 flex flex-col gap-5">
               <div className="text-2xl font-black mb-2">👥 Arkadaşlarım</div>
               {[
@@ -3030,7 +3371,7 @@ export default function LoungeApp() {
 
       {seciliArkadasProfil && (
         <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/65 backdrop-blur-sm" onClick={() => setSeciliArkadasProfil(null)}>
-          <div className="w-[960px] max-w-[95vw] max-h-[92vh] rounded-[24px] overflow-hidden bg-gradient-to-b from-blue-50 via-white to-sky-100 border-4 border-sky-200 shadow-[0_0_80px_rgba(96,165,250,0.65)] relative" onClick={(e)=>e.stopPropagation()}>
+          <div className="profile-modal w-[960px] max-w-[95vw] max-h-[92vh] rounded-[24px] overflow-hidden bg-gradient-to-b from-blue-50 via-white to-sky-100 border-4 border-sky-200 shadow-[0_0_80px_rgba(96,165,250,0.65)] relative" onClick={(e)=>e.stopPropagation()}>
             <div className="h-16 bg-gradient-to-r from-sky-400 via-blue-300 to-sky-300 flex items-center text-white font-black text-2xl relative">
               <button onClick={() => setDigerProfilSekme('profil')} className={`px-10 h-full flex items-center gap-2 rounded-br-[26px] transition ${digerProfilSekme === 'profil' ? 'bg-gradient-to-r from-yellow-400 to-orange-400 shadow-lg' : 'text-blue-900/70 hover:bg-white/20'}`}>👤 Profil</button>
               <button onClick={() => setDigerProfilSekme('gonderiler')} className={`px-10 h-full flex items-center gap-2 transition ${digerProfilSekme === 'gonderiler' ? 'bg-gradient-to-r from-yellow-400 to-orange-400 shadow-lg rounded-b-[22px]' : 'text-blue-900/70 hover:bg-white/20'}`}>▦ Gönderiler</button>
@@ -3067,7 +3408,7 @@ export default function LoungeApp() {
                     <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><span className="text-2xl">👤</span><span className="font-black text-blue-800">{seciliArkadasProfil.ad}</span></div>
                     <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><CipSimgesi boyut="md" /><span className="font-black text-blue-800">{(27000 + seciliArkadasProfil.vip*1200).toLocaleString()}</span></div>
                     <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><span className="text-2xl">●</span><span className={`font-black ${seciliArkadasProfil.aktif ? 'text-green-500' : 'text-gray-500'}`}>{seciliArkadasProfil.aktif ? 'Çevrimiçi' : 'Çevrimdışı'}</span></div>
-                    <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><span className="text-2xl">💎</span><span className="font-black text-blue-800">{(seciliArkadasProfil.vip / 10).toFixed(1)}</span></div>
+                    <div className="rounded-2xl bg-sky-100/85 border border-sky-200 px-4 py-3 flex items-center gap-3 shadow-sm"><ElmasSimgesi boyut="md" /><span className="font-black text-blue-800">{(seciliArkadasProfil.vip / 10).toFixed(1)}</span></div>
                   </div>
                   <div className="grid grid-cols-4 gap-3 mb-5">
                     <div className="rounded-2xl bg-white/85 border border-sky-200 p-3 text-center"><div className="text-xs text-sky-700 font-black">Oynanan oyun</div><div className="text-2xl text-blue-800 font-black">{seciliProfilOyunSayisi}</div></div>
@@ -3138,6 +3479,205 @@ export default function LoungeApp() {
       )}
 
       {hediyeCipPanelAcik && (
+        <div
+          className="gift-chip-modal fixed inset-0 z-[135] flex items-center justify-center bg-slate-950/70 p-3 text-blue-950 backdrop-blur-[3px]"
+          onClick={() => {
+            setHediyeCipPanelAcik(false);
+            setMiniArkadasSecAcik(false);
+            setHediyeCipGecmisAcik(false);
+          }}
+        >
+          <div
+            className="gift-chip-card relative w-[min(780px,94vw)] max-h-[min(650px,92vh)] overflow-hidden rounded-[22px] border-2 border-sky-200/90 bg-gradient-to-b from-sky-100 via-blue-50 to-white shadow-[0_24px_70px_rgba(15,23,42,0.45)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="gift-chip-header flex min-h-12 items-center gap-3 bg-gradient-to-r from-blue-600 via-sky-400 to-blue-600 px-4 text-white shadow-inner">
+              <div className="flex min-w-0 flex-1 items-center gap-2 text-xl font-black drop-shadow">
+                <CipSimgesi boyut="sm" />
+                <span>Hediye Çip</span>
+              </div>
+              <div className="hidden flex-1 justify-center text-sm font-black md:flex">
+                Tebrikler! <span className="mx-1 text-cyan-100">{hediyeCipSeciliOyuncu?.ad || isim}</span> oyuncusu hazır
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setHediyeCipPanelAcik(false);
+                  setMiniArkadasSecAcik(false);
+                  setHediyeCipGecmisAcik(false);
+                }}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 border-white/70 bg-white/20 text-2xl font-black text-white shadow hover:bg-white/30"
+                aria-label="Kapat"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="gift-chip-content space-y-4 p-5">
+              <div className="flex items-center justify-between gap-3 border-b border-sky-200/80 pb-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full border-[3px] border-white bg-gradient-to-br from-indigo-200 to-sky-100 text-3xl shadow-lg">
+                    👤
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-black text-blue-900">{isim}</div>
+                    <div className="mt-1 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-lg font-black text-slate-700 shadow-sm">
+                      <CipSimgesi boyut="sm" />
+                      {bakiyeCip.toLocaleString("tr-TR")}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHediyeCipGecmisAcik((acik) => !acik);
+                    setMiniArkadasSecAcik(false);
+                  }}
+                  className="rounded-xl border border-blue-300 bg-gradient-to-b from-blue-100 to-indigo-200 px-4 py-3 text-sm font-black text-blue-800 shadow hover:brightness-105"
+                >
+                  Hediyeler geçmişi
+                </button>
+              </div>
+
+              {hediyeCipGecmisAcik && (
+                <div className="gift-chip-history rounded-2xl border border-sky-200 bg-white/80 p-3 shadow-inner">
+                  {hediyeCipGecmisi.length === 0 ? (
+                    <div className="py-5 text-center text-sm font-bold text-sky-700">Henüz çip hediyesi gönderilmedi.</div>
+                  ) : (
+                    <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
+                      {hediyeCipGecmisi.map((kayit) => (
+                        <div key={kayit.id} className="flex items-center justify-between rounded-xl bg-sky-50 px-3 py-2 text-sm font-bold text-blue-900">
+                          <span>{kayit.oyuncuAd} <span className="text-blue-400">ID:{kayit.oyuncuId}</span></span>
+                          <span className="inline-flex items-center gap-1 text-amber-600">-{kayit.miktar.toLocaleString("tr-TR")} <CipSimgesi boyut="xs" /></span>
+                          <span className="text-xs text-slate-500">{kayit.tarih}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {miniArkadasSecAcik ? (
+                <div className="gift-chip-selector overflow-hidden rounded-[20px] border border-sky-200 bg-white/75 shadow-inner">
+                  <div className="grid grid-cols-[1fr_1fr_auto] items-center bg-blue-500/20 text-center text-base font-black text-blue-900">
+                    {([
+                      { id: "arkadaslar", ad: "Arkadaşlarım" },
+                      { id: "klan", ad: "Klan üyeleri" },
+                    ] as const).map((sekme) => (
+                      <button
+                        key={sekme.id}
+                        type="button"
+                        onClick={() => setHediyeCipArkadasSekmesi(sekme.id)}
+                        className={`px-5 py-3 transition ${hediyeCipArkadasSekmesi === sekme.id ? "bg-gradient-to-b from-yellow-300 to-orange-300 text-white drop-shadow" : "bg-blue-400/25 text-blue-900 hover:bg-blue-300/35"}`}
+                      >
+                        {sekme.ad}
+                      </button>
+                    ))}
+                    <div className="px-5 py-3 text-sm text-white drop-shadow">Tebrikler!</div>
+                  </div>
+                  <div className="gift-chip-friend-list max-h-[365px] overflow-y-auto p-3">
+                    {hediyeCipArkadaslari.map((arkadas, index) => (
+                      <button
+                        key={`${hediyeCipArkadasSekmesi}-${arkadas.id}`}
+                        type="button"
+                        onClick={() => {
+                          setHediyeCipTargetId(arkadas.id);
+                          setMiniArkadasSecAcik(false);
+                          setHediyeCipGecmisAcik(false);
+                        }}
+                        className={`gift-friend-row mb-2 grid w-full grid-cols-[64px_1fr_auto_auto] items-center gap-3 rounded-xl border border-white/70 px-3 py-2 text-left shadow-sm transition hover:scale-[1.01] hover:brightness-105 ${index % 2 === 0 ? "bg-sky-100" : "bg-amber-100"}`}
+                      >
+                        <div className="grid h-14 w-14 place-items-center rounded-full border-2 border-sky-300 bg-gradient-to-br from-white to-sky-100 text-2xl shadow">
+                          {arkadas.ad.slice(0, 1).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-1 text-lg font-black text-blue-900">
+                            <span className="text-sky-600">♂</span>
+                            {arkadas.vip > 0 && <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] text-white">VIP{arkadas.vip}</span>}
+                            <span className="truncate">{arkadas.ad}</span>
+                          </div>
+                          <div className="font-mono text-sm font-black text-sky-500">ID:{arkadas.id}</div>
+                        </div>
+                        <div className="hidden text-center text-sm font-black text-amber-600 sm:block">{arkadas.aktif ? "Oyunda" : `${(index + 1) * 43} dakika önce`}</div>
+                        <span className="rounded-lg bg-gradient-to-b from-emerald-300 to-emerald-600 px-7 py-2 text-center text-base font-black text-white shadow">Seç</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="gift-chip-form-grid grid grid-cols-[1fr_auto] gap-4">
+                  <div className="min-w-0 space-y-4">
+                    <div>
+                      <label className="mb-2 block text-lg font-black text-slate-600">Lütfen oyuncunun ID numarasını yazınız</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          maxLength={8}
+                          className="h-12 min-w-0 flex-1 rounded-lg border border-sky-200 bg-blue-100/80 px-4 text-lg font-black text-blue-900 outline-none shadow-inner placeholder:text-blue-300 focus:border-sky-400"
+                          placeholder="Lütfen ID numarasını yazınız"
+                          value={hediyeCipTargetId}
+                          onChange={(event) => setHediyeCipTargetId(event.target.value.replace(/\D/g, ""))}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMiniArkadasSecAcik(true);
+                            setHediyeCipGecmisAcik(false);
+                          }}
+                          className="shrink-0 rounded-lg border border-yellow-300 bg-gradient-to-b from-yellow-200 to-orange-400 px-6 text-base font-black text-white shadow hover:brightness-105"
+                        >
+                          Arkadaş seç
+                        </button>
+                      </div>
+                      {hediyeCipSeciliOyuncu && (
+                        <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-700">
+                          ● {hediyeCipSeciliOyuncu.ad} seçildi
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-lg font-black text-slate-600">Hediye edilecek çip miktarını yazınız</label>
+                      <input
+                        type="text"
+                        className="h-12 w-full rounded-lg border border-sky-200 bg-blue-100/80 px-4 text-lg font-black text-blue-900 outline-none shadow-inner placeholder:text-blue-300 focus:border-sky-400"
+                        placeholder="Hediye edilecek çip miktarını yazınız"
+                        value={hediyeCipMiktar}
+                        onChange={(event) => setHediyeCipMiktar(event.target.value.replace(/\D/g, ""))}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3 rounded-2xl bg-sky-50 px-4 py-3 text-lg font-black text-sky-700">
+                      <span className="grid h-9 w-9 place-items-center rounded-full bg-blue-200 text-white shadow">?</span>
+                      <CipSimgesi boyut="md" />
+                      <span>Çip hediye etmek için gereken masraf: {hediyeCipMasraf}</span>
+                    </div>
+                  </div>
+
+                  <div className="gift-chip-side-panel flex min-w-[185px] flex-col items-center justify-center rounded-2xl border border-sky-100 bg-gradient-to-b from-white to-sky-100 p-4 text-center shadow-inner">
+                    <CipSimgesi boyut="xl" />
+                    <div className="mt-3 text-sm font-black text-slate-500">Gönderilecek</div>
+                    <div className="text-2xl font-black text-blue-900">{hediyeCipMiktar ? Number(hediyeCipMiktar).toLocaleString("tr-TR") : "0"}</div>
+                    <div className="mt-2 text-xs font-bold text-slate-500">Alıcı: {hediyeCipSeciliOyuncu?.ad || "Seçilmedi"}</div>
+                  </div>
+
+                  <div className="col-span-2 flex justify-center pt-2">
+                    <button
+                      type="button"
+                      onClick={hediyeCipGonderAksiyonu}
+                      className="min-w-[210px] rounded-xl border border-yellow-300 bg-gradient-to-b from-yellow-200 via-amber-300 to-orange-400 px-8 py-3 text-xl font-black text-white shadow-[0_8px_0_rgba(180,83,9,0.45)] transition hover:-translate-y-0.5 hover:brightness-105 active:translate-y-1 active:shadow-none"
+                    >
+                      Hediyeyi onayla
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {false && hediyeCipPanelAcik && (
         <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-[70] backdrop-blur-sm">
           <div className="w-96 bg-slate-900 border border-yellow-500/40 rounded-2xl p-5 shadow-[0_0_30px_rgba(234,179,8,0.25)] relative">
             <div className="flex justify-between items-center border-b border-gray-800 pb-2 mb-4">
@@ -3174,93 +3714,116 @@ export default function LoungeApp() {
       )}
 
       {vipMarketAcik && (
-        <div className="fixed inset-0 z-[170] bg-indigo-950/95 text-white overflow-hidden">
+        <div className="shop-modal fixed inset-0 z-[170] bg-indigo-950/95 text-white overflow-y-auto lg:overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(125,211,252,0.28),transparent_22%),radial-gradient(circle_at_18%_82%,rgba(45,212,191,0.25),transparent_28%),linear-gradient(135deg,#0f1645_0%,#211452_45%,#072e5c_100%)]"></div>
           <div className="absolute inset-0 opacity-45 bg-[radial-gradient(circle_at_25%_20%,white_0_1px,transparent_2px),radial-gradient(circle_at_70%_42%,white_0_1px,transparent_2px)] bg-[length:48px_48px]"></div>
           <div className="absolute -right-20 bottom-[-70px] h-80 w-80 rounded-full border-[26px] border-cyan-200/20 bg-cyan-300/10 blur-[1px]"></div>
-          <div className="relative z-10 flex h-full">
-            <aside className="w-[250px] shrink-0 border-r border-cyan-200/25 bg-black/18 px-7 py-8 backdrop-blur-sm">
-              <div className="mb-12 text-5xl font-black italic text-white drop-shadow-[0_0_16px_rgba(125,211,252,0.95)]">Mağaza</div>
-              <div className="relative space-y-7 pl-3">
-                <div className="absolute left-[88px] top-3 bottom-3 w-px bg-cyan-100/35 shadow-[0_0_16px_rgba(125,211,252,0.85)]"></div>
-                {[
+          <div className="relative z-10 flex min-h-full flex-col lg:h-full lg:flex-row">
+            <aside className="w-full shrink-0 border-b border-cyan-200/25 bg-black/18 px-4 py-4 backdrop-blur-sm lg:w-[230px] lg:border-b-0 lg:border-r lg:px-7 lg:py-8">
+              <div className="mb-4 text-3xl font-black italic text-white drop-shadow-[0_0_16px_rgba(125,211,252,0.95)] lg:mb-12 lg:text-5xl">Mağaza</div>
+              <div className="relative flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-6 lg:overflow-visible lg:pl-3">
+                <div className="absolute left-[88px] top-3 bottom-3 hidden w-px bg-cyan-100/35 shadow-[0_0_16px_rgba(125,211,252,0.85)] lg:block"></div>
+                {([
                   { id: "çipler", ad: "Çip" },
                   { id: "vip", ad: "VIP" },
-                  { id: "bonus", ad: "Bonus" },
+                  { id: "elmas", ad: "Elmas" },
                   { id: "oge", ad: "Öğe" },
                   { id: "puan", ad: "Puan" },
                   { id: "klan", ad: "Klan" },
                   { id: "nostalji", ad: "Nostaljik Dekorasyon" },
-                ].map((kategori) => {
-                  const aktif = (kategori.id === "çipler" && magazaAktifSekme === "çipler") || (kategori.id === "vip" && magazaAktifSekme === "vip");
+                ] as { id: typeof magazaAktifSekme; ad: string }[]).map((kategori) => {
+                  const aktif = kategori.id === magazaAktifSekme;
                   return (
                     <button
                       key={kategori.id}
                       onClick={() => {
-                        if (kategori.id === "çipler" || kategori.id === "vip") setMagazaAktifSekme(kategori.id as "çipler" | "vip");
-                        else bildirimGoster("Mağaza", `${kategori.ad} bölümü hazırlanıyor.`, "bilgi");
+                        setMagazaAktifSekme(kategori.id);
                       }}
-                      className={`relative flex min-h-12 w-full items-center text-left text-2xl font-black transition ${aktif ? "text-white drop-shadow-[0_0_14px_rgba(125,211,252,1)]" : "text-sky-200/85 hover:text-white"}`}
+                      className={`relative flex min-h-10 shrink-0 items-center rounded-xl px-4 text-left text-base font-black transition lg:min-h-12 lg:w-full lg:rounded-none lg:px-0 lg:text-2xl ${aktif ? "bg-white/10 text-white drop-shadow-[0_0_14px_rgba(125,211,252,1)] lg:bg-transparent" : "text-sky-200/85 hover:text-white"}`}
                     >
-                      <span className={`absolute left-[77px] h-4 w-4 rounded-full border border-cyan-100 ${aktif ? "bg-cyan-200 shadow-[0_0_18px_rgba(103,232,249,1)]" : "bg-white/35"}`}></span>
-                      <span className="max-w-[150px] leading-tight">{kategori.ad}</span>
+                      <span className={`absolute left-[77px] hidden h-4 w-4 rounded-full border border-cyan-100 lg:block ${aktif ? "bg-cyan-200 shadow-[0_0_18px_rgba(103,232,249,1)]" : "bg-white/35"}`}></span>
+                      <span className="max-w-[150px] whitespace-nowrap leading-tight lg:whitespace-normal">{kategori.ad}</span>
                     </button>
                   );
                 })}
               </div>
             </aside>
 
-            <main className="flex-1 min-w-0 px-8 py-6">
-              <div className="mb-7 flex items-center justify-between">
-                <div className="flex gap-5">
-                  <div className="flex min-w-44 items-center gap-3 rounded-xl border border-cyan-300/25 bg-blue-900/65 px-4 py-2 shadow-[0_0_24px_rgba(37,99,235,0.25)]">
-                    <CipSimgesi boyut="lg" />
-                    <span className="text-2xl font-black text-cyan-100">{bakiyeCip.toLocaleString()}</span>
+            <main className="min-w-0 flex-1 px-4 py-4 lg:overflow-y-auto lg:px-6 lg:py-5">
+              <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
+                  <div className="flex min-w-0 items-center gap-2 rounded-xl border border-cyan-300/25 bg-blue-900/65 px-3 py-2 shadow-[0_0_24px_rgba(37,99,235,0.25)] sm:min-w-40">
+                    <CipSimgesi boyut="md" />
+                    <span className="truncate text-lg font-black text-cyan-100 lg:text-xl">{bakiyeCip.toLocaleString()}</span>
                   </div>
-                  <div className="flex min-w-36 items-center gap-3 rounded-xl border border-violet-300/25 bg-indigo-900/65 px-4 py-2">
-                    <span className="text-3xl">🏅</span>
-                    <span className="text-2xl font-black text-cyan-100">{oyunRutbePuani}</span>
+                  <div className="flex min-w-0 items-center gap-2 rounded-xl border border-violet-300/25 bg-indigo-900/65 px-3 py-2 sm:min-w-32">
+                    <span className="text-2xl">🏅</span>
+                    <span className="truncate text-lg font-black text-cyan-100 lg:text-xl">{magazaPuanBakiyesi}</span>
                   </div>
-                  <div className="flex min-w-36 items-center gap-3 rounded-xl border border-cyan-300/25 bg-indigo-900/65 px-4 py-2">
-                    <span className="text-3xl">💎</span>
-                    <span className="text-2xl font-black text-cyan-100">{bakiyeElmas.toFixed(1)}</span>
+                  <div className="flex min-w-0 items-center gap-2 rounded-xl border border-cyan-300/25 bg-indigo-900/65 px-3 py-2 sm:min-w-32">
+                    <ElmasSimgesi boyut="md" />
+                    <span className="truncate text-lg font-black text-cyan-100 lg:text-xl">{bakiyeElmas.toFixed(1)}</span>
                   </div>
-                  <div className="flex min-w-32 items-center gap-3 rounded-xl border border-amber-300/25 bg-indigo-900/65 px-4 py-2">
-                    <span className="text-3xl">🛡️</span>
-                    <span className="text-2xl font-black text-cyan-100">VIP{vipSeviyesi}</span>
+                  <div className="flex min-w-0 items-center gap-2 rounded-xl border border-amber-300/25 bg-indigo-900/65 px-3 py-2 sm:min-w-28">
+                    <span className="text-2xl">🛡️</span>
+                    <span className="truncate text-lg font-black text-cyan-100 lg:text-xl">{dekorasyonJetonu}</span>
                   </div>
                 </div>
-                <button onClick={() => setVipMarketAcik(false)} className="h-14 w-14 rounded-full border-2 border-cyan-100/70 bg-white/10 text-4xl font-black text-white shadow-[0_0_24px_rgba(103,232,249,0.75)] hover:bg-white/20">×</button>
+                <button onClick={() => setVipMarketAcik(false)} className="h-11 w-11 self-end rounded-full border-2 border-cyan-100/70 bg-white/10 text-3xl font-black leading-none text-white shadow-[0_0_24px_rgba(103,232,249,0.75)] hover:bg-white/20 xl:self-auto">×</button>
               </div>
 
               {magazaAktifSekme === "çipler" && (
-                <div className="grid grid-cols-4 gap-5">
+                <div className="shop-product-grid grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-4">
                   {cipPaketleri.map((p, index) => {
-                    const bonuslar = [0, 0, 10, 20, 30, 50, 60, 75];
-                    const bonus = bonuslar[index] || 0;
-                    const eskiMiktar = bonus > 0 ? Math.round(p.miktar / (1 + bonus / 100)).toLocaleString("tr-TR") : "";
+                    const etiketler = ["", "", "Avantajlı", "Popüler", "", "Lounge", "Büyük Paket", "Zirve"];
+                    const etiket = etiketler[index] || "";
                     return (
                       <button
                         key={p.id}
                         onClick={() => cipSatinAl(p.miktar, p.fiyat)}
-                        className="group relative min-h-[270px] overflow-hidden rounded-[22px] border-[3px] border-cyan-300 bg-gradient-to-b from-sky-100 via-blue-100 to-amber-50 p-4 text-blue-900 shadow-[0_18px_34px_rgba(6,182,212,0.28)] hover:-translate-y-1 hover:brightness-105 active:scale-95 transition"
+                        className="shop-product-card group relative min-h-[230px] overflow-hidden rounded-[20px] border-[3px] border-cyan-300 bg-gradient-to-b from-sky-100 via-blue-100 to-amber-50 p-3 text-blue-900 shadow-[0_18px_34px_rgba(6,182,212,0.28)] transition hover:-translate-y-1 hover:brightness-105 active:scale-95 xl:min-h-[250px] xl:p-4"
                       >
                         <div className="absolute inset-0 opacity-45 bg-[radial-gradient(circle_at_35%_18%,white,transparent_25%),repeating-linear-gradient(135deg,rgba(255,255,255,0.45)_0_2px,transparent_2px_9px)]"></div>
-                        <div className="absolute left-3 right-3 top-3 rounded-2xl border-4 border-cyan-300/60 bg-cyan-200/55 px-2 py-2 text-center text-3xl font-black text-blue-700 shadow-inner">{p.miktarYazi.replace(" Çip", "")}</div>
-                        {eskiMiktar && <div className="absolute left-1/2 top-[72px] -translate-x-1/2 text-xl font-black text-slate-500/70 line-through">{eskiMiktar}</div>}
-                        {bonus > 0 && <div className="absolute right-3 top-24 rotate-[-8deg] rounded-md bg-gradient-to-r from-red-500 to-orange-500 px-3 py-1 text-xl font-black text-white shadow-lg">+%{bonus}</div>}
-                        <div className="relative z-10 mt-[92px] flex h-24 items-center justify-center">
-                          <div className="relative h-24 w-32">
-                            <CipSimgesi boyut="xl" className="absolute left-8 top-1" />
-                            <CipSimgesi boyut="lg" className="absolute left-1 top-8 rotate-[-18deg]" />
-                            <CipSimgesi boyut="lg" className="absolute right-2 top-9 rotate-[15deg]" />
-                            {index >= 5 && <div className="absolute bottom-0 left-2 right-2 h-12 rounded-xl border-2 border-amber-300 bg-gradient-to-b from-cyan-500 to-blue-800 shadow-lg"></div>}
+                        <div className="shop-product-amount absolute left-3 right-3 top-3 rounded-2xl border-4 border-cyan-300/60 bg-cyan-200/55 px-2 py-2 text-center text-2xl font-black text-blue-700 shadow-inner xl:text-[28px]">{p.miktarYazi.replace(" Çip", "")}</div>
+                        {etiket && <div className="absolute right-3 top-[62px] rotate-[-7deg] rounded-md bg-gradient-to-r from-red-500 to-orange-500 px-2.5 py-1 text-xs font-black text-white shadow-lg xl:text-sm">{etiket}</div>}
+                        <div className="shop-product-visual relative z-10 mt-[78px] flex h-[94px] items-center justify-center xl:h-[106px]">
+                          <div className="relative h-[92px] w-32 xl:h-[100px] xl:w-36">
+                            {index >= 5 && <div className="absolute bottom-2 left-3 right-3 h-11 rounded-xl border-2 border-amber-300 bg-gradient-to-b from-cyan-500 to-blue-800 shadow-lg"></div>}
+                            <CipSimgesi boyut={index >= 5 ? "md" : "lg"} className="absolute left-[52px] top-1 xl:left-[52px]" />
+                            <CipSimgesi boyut="md" className="absolute left-6 top-12 rotate-[-18deg]" />
+                            <CipSimgesi boyut="md" className="absolute right-6 top-12 rotate-[15deg]" />
+                            {index >= 4 && <CipSimgesi boyut="sm" className="absolute left-[62px] top-[66px] rotate-[-8deg]" />}
                           </div>
                         </div>
-                        <div className="absolute left-5 right-5 bottom-5 rounded-lg border-2 border-emerald-300 bg-gradient-to-r from-emerald-200 via-green-300 to-emerald-200 py-2 text-center text-3xl font-black text-emerald-900 shadow-[0_8px_18px_rgba(16,185,129,0.28)]">{p.fiyat}</div>
+                        <div className="shop-product-price absolute left-4 right-4 bottom-4 z-20 rounded-lg border-2 border-emerald-300 bg-gradient-to-r from-emerald-200 via-green-300 to-emerald-200 py-2 text-center text-2xl font-black text-emerald-900 shadow-[0_8px_18px_rgba(16,185,129,0.28)] xl:text-[28px]">{p.fiyat}</div>
                       </button>
                     );
                   })}
+                </div>
+              )}
+
+              {magazaAktifSekme === "elmas" && (
+                <div className="shop-product-grid grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-4">
+                  {elmasPaketleri.map((p, index) => (
+                    <button
+                      key={p.id}
+                      onClick={() => elmasSatinAl(p.miktar, p.fiyat)}
+                      className="shop-product-card group relative min-h-[230px] overflow-hidden rounded-[20px] border-[3px] border-cyan-200 bg-gradient-to-b from-sky-100 via-cyan-100 to-blue-50 p-3 text-blue-900 shadow-[0_18px_34px_rgba(6,182,212,0.24)] transition hover:-translate-y-1 hover:brightness-105 active:scale-95 xl:min-h-[250px] xl:p-4"
+                    >
+                      <div className="absolute inset-0 opacity-55 bg-[radial-gradient(circle_at_30%_18%,white,transparent_25%),radial-gradient(circle_at_78%_30%,rgba(125,211,252,0.75),transparent_22%),repeating-linear-gradient(135deg,rgba(255,255,255,0.45)_0_2px,transparent_2px_9px)]"></div>
+                      <div className="shop-product-amount absolute left-3 right-3 top-3 rounded-2xl border-4 border-cyan-300/60 bg-cyan-200/55 px-2 py-2 text-center text-xl font-black text-blue-700 shadow-inner xl:text-2xl">{p.miktarYazi}</div>
+                      {p.etiket && <div className="absolute right-3 top-[62px] rotate-[-7deg] rounded-md bg-gradient-to-r from-fuchsia-500 to-blue-500 px-2.5 py-1 text-xs font-black text-white shadow-lg xl:text-sm">{p.etiket}</div>}
+                      <div className="shop-product-visual relative z-10 mt-[78px] flex h-[94px] items-center justify-center xl:h-[106px]">
+                        <div className="relative flex h-[92px] w-32 items-center justify-center xl:h-[100px] xl:w-36">
+                          <ElmasSimgesi boyut={index >= 4 ? "xl" : "lg"} className={index >= 4 ? "scale-75" : "scale-125"} />
+                          {index >= 2 && <ElmasSimgesi boyut="md" className="absolute left-4 bottom-4 rotate-[-15deg]" />}
+                          {index >= 3 && <ElmasSimgesi boyut="sm" className="absolute right-5 top-8 rotate-[18deg]" />}
+                        </div>
+                      </div>
+                      <div className="relative z-10 mt-1 text-center text-xs font-black text-cyan-700/80">{p.ad}</div>
+                      <div className="shop-product-price absolute left-4 right-4 bottom-4 z-20 rounded-lg border-2 border-emerald-300 bg-gradient-to-r from-emerald-200 via-green-300 to-emerald-200 py-2 text-center text-2xl font-black text-emerald-900 shadow-[0_8px_18px_rgba(16,185,129,0.28)] xl:text-[28px]">{p.fiyat}</div>
+                    </button>
+                  ))}
                 </div>
               )}
 
@@ -3295,6 +3858,97 @@ export default function LoungeApp() {
                         </button>
                       );
                     })}
+                  </div>
+                </div>
+              )}
+
+              {magazaAktifSekme === "puan" && (
+                <div className="grid h-[calc(100vh-120px)] grid-cols-[1fr_420px] gap-7">
+                  <div className="grid grid-cols-3 gap-5 content-start overflow-y-auto pr-2">
+                    {puanMagazaUrunleri.map((urun) => {
+                      const secili = seciliPuanUrunId === urun.id;
+                      return (
+                        <button
+                          key={urun.id}
+                          onClick={() => setSeciliPuanUrunId(urun.id)}
+                          className={`relative min-h-[230px] overflow-hidden rounded-[22px] border-[3px] bg-gradient-to-b from-sky-100 via-blue-100 to-amber-50 p-4 text-blue-900 shadow-xl transition hover:-translate-y-1 ${secili ? "border-yellow-300 shadow-[0_0_30px_rgba(250,204,21,0.55)]" : "border-cyan-300"}`}
+                        >
+                          <div className="absolute inset-0 opacity-45 bg-[radial-gradient(circle_at_35%_18%,white,transparent_25%),repeating-linear-gradient(135deg,rgba(255,255,255,0.45)_0_2px,transparent_2px_9px)]"></div>
+                          <div className="relative z-10 min-h-12 text-center text-2xl font-black leading-6 text-blue-700">{urun.ad}</div>
+                          <div className="relative z-10 mt-5 flex h-20 items-center justify-center">
+                            {urun.ikon === "cip" && <div className="relative h-20 w-28"><CipSimgesi boyut="xl" className="absolute left-8 top-0" /><CipSimgesi boyut="md" className="absolute left-4 top-11" /><CipSimgesi boyut="md" className="absolute right-3 top-10" /></div>}
+                            {urun.ikon === "cerceve" && <div className="h-20 w-20 rounded-2xl border-[7px] border-yellow-300 bg-white/40 shadow-[0_0_18px_rgba(250,204,21,0.75)]"></div>}
+                            {urun.ikon === "balon" && <div className="h-16 w-24 rounded-2xl border-4 border-sky-400 bg-white/50 shadow-lg"></div>}
+                            {urun.ikon === "masa" && <div className="h-16 w-28 rounded-xl border-4 border-orange-400 bg-gradient-to-b from-blue-300 to-orange-300 shadow-lg"></div>}
+                            {urun.ikon === "lobi" && <div className="h-16 w-28 rounded-xl border-4 border-violet-300 bg-gradient-to-b from-indigo-300 to-amber-200 shadow-lg"></div>}
+                            {urun.ikon === "efekt" && <div className="text-5xl font-black text-orange-500 drop-shadow">101</div>}
+                          </div>
+                          <div className="absolute left-5 right-5 bottom-5 flex items-center justify-center gap-2 rounded-lg border-2 border-emerald-300 bg-gradient-to-r from-emerald-200 via-green-300 to-emerald-200 py-2 text-center text-2xl font-black text-emerald-900 shadow">
+                            <span className="rounded-md bg-violet-600 px-1.5 py-0.5 text-[10px] text-white">Puan</span>{urun.puan}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded-[22px] border-[3px] border-cyan-200 bg-gradient-to-b from-sky-100 via-blue-100 to-amber-50 p-6 text-center text-blue-900 shadow-xl">
+                    <div className="flex h-40 items-center justify-center">
+                      {seciliPuanUrun.ikon === "cip" ? <CipSimgesi boyut="xl" /> : <div className="rounded-3xl border-4 border-cyan-300 bg-white/50 px-10 py-8 text-6xl">{seciliPuanUrun.ikon === "cerceve" ? "▢" : seciliPuanUrun.ikon === "balon" ? "▭" : seciliPuanUrun.ikon === "efekt" ? "101" : "✦"}</div>}
+                    </div>
+                    <div className="mx-auto mt-4 w-72 rounded-2xl border-4 border-cyan-300/60 bg-cyan-200/55 px-4 py-2 text-2xl font-black text-blue-700">{seciliPuanUrun.kisa}</div>
+                    <div className="mt-7 text-2xl font-black leading-9 text-blue-800">{seciliPuanUrun.aciklama}</div>
+                    <button onClick={() => puanUrunuAl(seciliPuanUrun)} className="mt-8 w-full rounded-xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-200 via-green-300 to-emerald-200 py-3 text-2xl font-black text-emerald-900 shadow hover:brightness-105 active:scale-95">Puan ile Al</button>
+                  </div>
+                </div>
+              )}
+
+              {magazaAktifSekme === "nostalji" && (
+                <div className="grid h-[calc(100vh-120px)] grid-cols-[1fr_420px] gap-7">
+                  <div className="overflow-y-auto pr-2">
+                    <div className="mb-5 flex rounded-xl border border-cyan-300/30 bg-sky-200/20">
+                      {["▣", "▭", "▰", "▧", "✦"].map((ikon, index) => (
+                        <button key={ikon} className={`h-12 flex-1 text-3xl font-black ${index === 0 ? "bg-gradient-to-r from-yellow-300 to-orange-400 text-white" : "text-cyan-100/75"}`}>{ikon}</button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-3 gap-5">
+                      {dekorasyonUrunleri.map((dekor) => {
+                        const sahip = alinanDekorlar.includes(dekor.id);
+                        const aktif = aktifDekorId === dekor.id;
+                        return (
+                          <button
+                            key={dekor.id}
+                            onClick={() => setSeciliDekorId(dekor.id)}
+                            className={`relative min-h-[230px] overflow-hidden rounded-[22px] border-[3px] bg-gradient-to-b from-sky-100 via-blue-100 to-amber-50 p-4 text-blue-900 shadow-xl transition hover:-translate-y-1 ${seciliDekorId === dekor.id ? "border-yellow-300 shadow-[0_0_30px_rgba(250,204,21,0.55)]" : "border-cyan-300"}`}
+                          >
+                            <div className="absolute inset-0 opacity-45 bg-[radial-gradient(circle_at_35%_18%,white,transparent_25%),repeating-linear-gradient(135deg,rgba(255,255,255,0.45)_0_2px,transparent_2px_9px)]"></div>
+                            <div className="relative z-10 min-h-12 text-center text-xl font-black leading-6 text-blue-700">{dekor.ad}</div>
+                            <div className="relative z-10 mt-5 flex h-20 items-center justify-center">
+                              <div className={`relative h-20 w-20 rounded-2xl bg-gradient-to-br ${dekor.renk} ${dekor.cerceve} flex items-center justify-center text-4xl`}>{dekor.ikon}</div>
+                            </div>
+                            <div className="absolute left-5 right-5 bottom-5 rounded-lg border-2 border-emerald-300 bg-gradient-to-r from-emerald-200 via-green-300 to-emerald-200 py-2 text-center text-xl font-black text-emerald-900 shadow">{aktif ? "Kuşanıldı" : sahip ? "Kuşan" : "Satın al"}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] border-[3px] border-cyan-200 bg-gradient-to-b from-sky-100 via-blue-100 to-amber-50 p-6 text-center text-blue-900 shadow-xl">
+                    <div className="flex h-44 items-center justify-center gap-10">
+                      <div className={`h-28 w-28 rounded-3xl bg-gradient-to-br ${seciliDekor.renk} ${seciliDekor.cerceve} flex items-center justify-center text-6xl`}>{seciliDekor.ikon}</div>
+                      <div className={`h-28 w-28 rounded-full bg-gradient-to-br from-amber-200 to-orange-500 ${seciliDekor.cerceve} flex items-center justify-center text-5xl`}>{profilAvatar}</div>
+                    </div>
+                    <div className="mx-auto mt-4 w-80 rounded-2xl border-4 border-cyan-300/60 bg-cyan-200/55 px-4 py-2 text-xl font-black text-blue-700">{seciliDekor.ad}</div>
+                    <div className="mt-7 text-2xl font-black leading-9 text-blue-800">{seciliDekor.aciklama}</div>
+                    <button onClick={() => dekorSatinAlVeyaKusan(seciliDekor)} className="mt-8 w-full rounded-xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-200 via-green-300 to-emerald-200 py-3 text-2xl font-black text-emerald-900 shadow hover:brightness-105 active:scale-95">
+                      {alinanDekorlar.includes(seciliDekor.id) ? "Kuşan" : `${seciliDekor.fiyat} Jeton ile Satın Al`}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {["oge", "klan"].includes(magazaAktifSekme) && (
+                <div className="flex h-[calc(100vh-120px)] items-center justify-center rounded-[28px] border border-cyan-300/25 bg-white/10 text-center">
+                  <div>
+                    <div className="text-5xl font-black">Yakında</div>
+                    <div className="mt-3 text-xl font-bold text-cyan-100/80">Bu mağaza bölümü hazırlanıyor.</div>
                   </div>
                 </div>
               )}
@@ -3388,19 +4042,19 @@ export default function LoungeApp() {
       {/* MODAL: LÜKS MASA LİSTESİ — OKEY / PİŞTİ / TAVLA            */}
       {/* ======================================================== */}
       {masaListeOyunu && (
-        <div className="absolute inset-0 z-[100] overflow-hidden text-white">
+        <div className="table-list-modal absolute inset-0 z-[100] overflow-hidden text-white">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(255,244,207,0.55),rgba(177,124,54,0.18)_38%,rgba(17,26,42,0.92)_100%)]"></div>
           <div className="absolute inset-0 opacity-80 bg-[linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0)_30%),linear-gradient(90deg,rgba(255,255,255,0.10),rgba(255,255,255,0)_20%,rgba(255,255,255,0.08)_80%,rgba(255,255,255,0))]"></div>
 
           {/* Üst bar */}
-          <div className="relative z-10 flex items-center justify-between px-6 py-3 bg-black/22 backdrop-blur-sm border-b border-white/15">
+          <div className="table-list-topbar relative z-10 flex items-center justify-between px-6 py-3 bg-black/22 backdrop-blur-sm border-b border-white/15">
             <div className="flex items-center gap-2 bg-black/35 rounded-xl px-4 py-2 shadow-lg">
               <CipSimgesi boyut="md" />
               <span className="font-black text-lg">{bakiyeCip.toLocaleString()}</span>
               <button onClick={() => { setVipMarketAcik(true); setMasaListeOyunu(null); }} className="ml-2 w-8 h-8 rounded-lg bg-emerald-500 text-white text-2xl leading-none shadow">+</button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="table-list-search flex items-center gap-3">
               <input placeholder="Oda numarası giriniz" className="w-72 rounded-xl bg-black/35 border border-white/20 px-4 py-2 text-sm font-bold outline-none placeholder:text-sky-100/70" />
               <button className="rounded-xl bg-gradient-to-b from-yellow-300 to-orange-500 text-amber-950 px-5 py-2 font-black shadow-lg">🔍 Ara</button>
             </div>
@@ -3409,21 +4063,21 @@ export default function LoungeApp() {
           </div>
 
           {/* Filtreler */}
-          <div className="relative z-10 mx-auto mt-3 flex w-[88%] items-center justify-center gap-2 rounded-full bg-white/70 px-4 py-1.5 text-sky-700 shadow-lg backdrop-blur">
+          <div className="table-list-filters relative z-10 mx-auto mt-3 flex w-[88%] items-center justify-center gap-2 rounded-full bg-white/70 px-4 py-1.5 text-sky-700 shadow-lg backdrop-blur">
             {['Farketmez','Katlamalı','Eşli','Yardımlı','25 sn','Farketmez'].map((f,i)=>(
               <button key={i} className="rounded-full bg-sky-100/80 px-4 py-1 text-xs font-black hover:bg-yellow-200">{f} ▾</button>
             ))}
             <button className="ml-2 rounded-full bg-sky-500 text-white px-3 py-1 font-black">↻</button>
           </div>
 
-          <div className="relative z-10 mt-5 flex items-center justify-center gap-5 px-5">
+          <div className="table-list-cards relative z-10 mt-5 flex items-center justify-center gap-5 px-5">
             {[
               { no: 3262, el:'3 EL', ucret: masaListeOyunu === '101 Okey' ? '50' : masaListeOyunu === 'Pişti' ? '10.000' : '25.000', kat:'Katlamasız', tur:'Eşli', sure:'25sn', renk:'from-emerald-400/95 to-amber-100/95', oyuncular:['gül','Veysel ..','Mysterl..'], dolu:3 },
               { no: 3176, el:'1 EL', ucret: masaListeOyunu === '101 Okey' ? '50' : masaListeOyunu === 'Pişti' ? '20.000' : '50.000', kat:'Katlamasız', tur:'Eşli', sure:'25sn', renk:'from-green-300/95 to-yellow-100/95', oyuncular:['Nur','Fevzi Ce..','hüsocan'], dolu:3 },
               { no: 3991, el:'1 EL', ucret: masaListeOyunu === '101 Okey' ? '50' : masaListeOyunu === 'Pişti' ? '50.000' : '100.000', kat:'Katlamasız', tur:'Eşli', sure:'25sn', renk:'from-emerald-300/95 to-amber-100/95', oyuncular:['Çağrı16','arslan','Nuran S..'], dolu:3 },
               { no: 2225, el:'3 EL', ucret:'40.000', kat:'Katlamalı', tur:'Tek', sure:'15sn', renk:'from-sky-500/95 to-amber-100/95', oyuncular:['SM-A55..','Mustafa..'], dolu:2 },
             ].map((oda,idx)=>(
-              <div key={oda.no} className={`relative h-[380px] w-[250px] shrink-0 rounded-[28px] bg-gradient-to-b ${oda.renk} p-4 text-white shadow-[0_18px_35px_rgba(0,0,0,0.35)] border-2 border-white/45 overflow-hidden hover:-translate-y-2 transition-all`}>
+              <div key={oda.no} className={`table-list-card relative h-[380px] w-[250px] shrink-0 rounded-[28px] bg-gradient-to-b ${oda.renk} p-4 text-white shadow-[0_18px_35px_rgba(0,0,0,0.35)] border-2 border-white/45 overflow-hidden hover:-translate-y-2 transition-all`}>
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(255,255,255,0.85),rgba(255,255,255,0)_55%)]"></div>
                 <div className="relative z-10 flex items-center justify-between text-xs font-black drop-shadow">
                   <span>🏠{oda.no}</span>
@@ -3464,7 +4118,7 @@ export default function LoungeApp() {
             ))}
           </div>
 
-          <div className="relative z-10 mt-8 flex justify-center gap-5">
+          <div className="table-list-actions relative z-10 mt-8 flex justify-center gap-5">
             <button onClick={() => {
               if (masaListeOyunu === '101 Okey') { setOkeyAcik(true); setOkeyDurum(yeniOkeyOyunu(isim || 'Oyuncu')); setOkeyDizMod('serbest'); }
               if (masaListeOyunu === 'Pişti') { setPistiDurum(yeniPistiOyunu()); setPistiAcik(true); }
@@ -3516,6 +4170,16 @@ export default function LoungeApp() {
           { id: 'kanal4', ad: 'Kanal 4' }, { id: 'kanal5', ad: 'Kanal 5' }, { id: 'kanal6', ad: 'Kanal 6' }, { id: 'vip', ad: 'Vip' },
         ] as const;
         const profilAvatarlari = ['👑', '🟣', '🟢', '🔵'];
+        const profilAvatarResimleri = [
+          '/okey-assets/avatar-suleyman.svg',
+          '/okey-assets/avatar-ahmet.svg',
+          '/okey-assets/avatar-mehmet.svg',
+          '/okey-assets/avatar-zeynep.svg',
+        ];
+        const oyunProfilResmi = (idx: number) => {
+          if (idx === 0 && profilAvatar.startsWith('data:')) return profilAvatar;
+          return profilAvatarResimleri[idx] || profilAvatarResimleri[0];
+        };
         const profilRutbeleri = ['VIP 8', 'VIP 25', 'VIP 21', 'VIP 21'];
         const profilSeviyeleri = [130, 25, 21, 21];
         const profilSehirleri = ['İstanbul', 'Ankara', 'İzmir', 'Bursa'];
@@ -3548,10 +4212,11 @@ export default function LoungeApp() {
         };
 
         // Taş bileşeni — resimdeki gibi beyaz kart, üstte sayı, ortada sembol
-        const Tas = ({ tas, onClick, disabled, secili, grupta, draggable, onDragStart, onDragOver, onDrop, mini }: {
+        const Tas = ({ tas, onClick, disabled, pasif, secili, grupta, draggable, onDragStart, onDragOver, onDrop, mini }: {
           tas: {id:number;renk:string;deger:number;okeyMi:boolean};
           onClick?: ()=>void;
           disabled?: boolean;
+          pasif?: boolean;
           secili?: boolean;
           grupta?: boolean;
           draggable?: boolean;
@@ -3565,24 +4230,27 @@ export default function LoungeApp() {
           return (
             <div
               role="button"
-              tabIndex={disabled ? -1 : 0}
-              onClick={disabled ? undefined : onClick}
-              draggable={Boolean(draggable && !disabled)}
-              onDragStart={(e) => { if (disabled) return; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(tas.id)); onDragStart?.(); }}
-              onDragOver={(e) => { if (!disabled) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver?.(e); } }}
-              onDrop={(e) => { e.preventDefault(); if (!disabled) onDrop?.(); }}
+              tabIndex={disabled || pasif ? -1 : 0}
+              onClick={disabled || pasif ? undefined : onClick}
+              draggable={Boolean(draggable && !disabled && !pasif)}
+              onDragStart={(e) => { if (disabled || pasif) return; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(tas.id)); onDragStart?.(); }}
+              onDragOver={(e) => { if (!disabled && !pasif) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver?.(e); } }}
+              onDrop={(e) => { e.preventDefault(); if (!disabled && !pasif) onDrop?.(); }}
               onDragEnd={() => setOkeySuruklenenTas(null)}
               style={{
                 transform: `perspective(620px) rotateX(6deg) ${secili ? 'translateY(-10px)' : ''}`,
-                background: 'linear-gradient(180deg, #fffdf5 0%, #ffffff 45%, #e9dfc9 100%)',
+                backgroundImage: "url('/okey-assets/tile-face.svg')",
+                backgroundSize: '100% 100%',
+                backgroundRepeat: 'no-repeat',
+                backgroundColor: 'transparent',
                 boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.95), inset 0 -4px 7px rgba(117,89,45,0.22), 0 7px 0 #c8b894, 0 13px 18px rgba(0,0,0,0.38)',
                 touchAction: 'none'
               }}
-              className={`relative ${mini ? 'w-[24px] h-[34px] rounded-md py-0.5' : 'w-[42px] h-[60px] rounded-lg py-1'} flex flex-col items-center justify-between shadow-md transition-all select-none border-2
+              className={`relative ${mini ? 'w-[24px] h-[34px] rounded-md py-0.5' : 'w-[38px] h-[54px] rounded-lg py-1'} flex flex-col items-center justify-between shadow-md transition-all select-none border-2
                 ${borderRenk[tas.renk] || 'border-gray-300'}
                 ${secili ? 'shadow-[0_8px_20px_rgba(250,204,21,0.6)] ring-2 ring-yellow-400' : ''}
                 ${grupta ? 'ring-1 ring-green-400 shadow-[0_0_6px_rgba(34,197,94,0.5)]' : ''}
-                ${!disabled && !secili ? 'hover:-translate-y-3 hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)] cursor-grab active:cursor-grabbing active:scale-95' : ''}
+                ${!disabled && !pasif && !secili ? 'hover:-translate-y-3 hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)] cursor-grab active:cursor-grabbing active:scale-95' : ''}
                 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
               <span className={`${mini ? 'text-[7px]' : 'text-[11px]'} font-black leading-none ${r.text} w-full text-left pl-0.5`}>
                 {tas.okeyMi ? '★' : tas.deger}
@@ -3602,12 +4270,44 @@ export default function LoungeApp() {
           <div
             className={`${mini ? 'w-[30px] h-[42px]' : dikey ? 'w-[34px] h-[48px]' : 'w-[42px] h-[56px]'} rounded-md border border-amber-300/70 shadow-[0_4px_0_rgba(75,38,12,0.88),0_8px_12px_rgba(0,0,0,0.34)] flex items-center justify-center overflow-hidden`}
             style={{
-              background: 'linear-gradient(135deg, #b9823a 0%, #81501e 48%, #351807 100%)',
+              backgroundImage: "url('/okey-assets/tile-back.svg')",
+              backgroundSize: '100% 100%',
+              backgroundRepeat: 'no-repeat',
+              backgroundColor: 'transparent',
               transform: 'perspective(700px) rotateX(6deg)'
             }}>
             <div className="w-full h-full opacity-60" style={{backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.18) 0px, rgba(255,255,255,0.18) 2px, transparent 2px, transparent 8px)'}}></div>
           </div>
         );
+
+        const OkeyProfilRozeti = ({ idx, className = "", yon = "bottom" }: { idx: number; className?: string; yon?: "top" | "left" | "right" | "bottom" }) => {
+          const oyuncu = okeyDurum.oyuncular[idx];
+          const aktif = okeyDurum.aktifOyuncu === idx;
+          const ad = idx === 0 ? (isim || oyuncu?.isim || "Süleyman") : (oyuncu?.isim || "Oyuncu");
+          const dikey = yon === "left" || yon === "right";
+
+          return (
+            <button
+              type="button"
+              onClick={() => oyunProfiliniAc(idx)}
+              className={`okey-player-badge absolute z-[58] flex items-center gap-2 rounded-2xl border border-white/30 bg-slate-950/55 px-2.5 py-2 text-left text-white shadow-[0_16px_32px_rgba(0,0,0,0.38)] backdrop-blur-md transition hover:scale-[1.03] ${aktif ? "ring-2 ring-emerald-300" : ""} ${dikey ? "max-w-[156px]" : "min-w-[190px]"} ${className}`}
+            >
+              <span className={`relative grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full border-[3px] ${aktif ? "border-emerald-300" : "border-cyan-200"} bg-gradient-to-br from-sky-200 to-indigo-700 text-2xl font-black shadow-lg`}>
+                <img src={oyunProfilResmi(idx)} alt="" className="h-full w-full object-cover" />
+                <span className="absolute -bottom-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950">V{idx === 0 ? vipSeviyesi : profilSeviyeleri[idx]}</span>
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-black drop-shadow">{ad}</span>
+                <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-black/35 px-2 py-0.5 text-[11px] font-black text-yellow-200">
+                  <CipSimgesi boyut="xs" /> {profilCipleri[idx]?.toLocaleString("tr-TR")}
+                </span>
+                <span className={`mt-1 block text-[10px] font-black ${aktif ? "text-emerald-300" : "text-white/60"}`}>
+                  {aktif ? "Sırası geldi" : idx === 0 ? "Sen" : rakipTasSayisiYazi(idx) || "Kapalı"}
+                </span>
+              </span>
+            </button>
+          );
+        };
 
         const grupIdSet = new Set<number>();
         if (dizAnaliz) dizAnaliz.gruplar.forEach(g => g.forEach(t => grupIdSet.add(t.id)));
@@ -3617,14 +4317,15 @@ export default function LoungeApp() {
         // Taşı ıstakanın üstüne/masa alanına bırakmak taş atma hareketidir; ayrı kutu yoktur.
         const el = okeyDurum.oyuncular[0].el;
         const SLOT_SAYISI = 14;
-        const TAS_W = 42;
-        const TAS_H = 60;
-        const SLOT_W = 50;
-        const ROW_Y = [12, 78];
+        const TAS_W = 38;
+        const TAS_H = 54;
+        const SLOT_W = 42;
+        const RACK_PAD_X = 32;
+        const ROW_Y = [12, 76];
 
         const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
         const tasVarsayilanPozisyon = (index: number) => ({
-          x: 28 + (index % SLOT_SAYISI) * SLOT_W,
+          x: RACK_PAD_X + (index % SLOT_SAYISI) * SLOT_W,
           y: ROW_Y[index < SLOT_SAYISI ? 0 : 1],
         });
 
@@ -3633,8 +4334,8 @@ export default function LoungeApp() {
           if (!rect) return 0;
           const localX = clientX - rect.left;
           const localY = clientY - rect.top;
-          const col = clamp(Math.round((localX - 28 - TAS_W / 2) / SLOT_W), 0, SLOT_SAYISI - 1);
-          const row = localY < 70 ? 0 : 1;
+          const col = clamp(Math.round((localX - RACK_PAD_X - TAS_W / 2) / SLOT_W), 0, SLOT_SAYISI - 1);
+          const row = localY < 68 ? 0 : 1;
           return clamp(row * SLOT_SAYISI + col, 0, el.length - 1);
         };
 
@@ -3739,8 +4440,35 @@ export default function LoungeApp() {
           );
         };
 
+        const renderAtilanTasKumesi = (oyuncuIdx: number, className: string, baseRotate = 0) => {
+          const taslar = (okeyDurum.atilanTasGecmisi || [])
+            .filter(kayit => kayit.oyuncuIdx === oyuncuIdx)
+            .slice(-3);
+
+          if (!taslar.length) return null;
+
+          return (
+            <div className={`okey-discard-pile absolute z-40 h-[76px] w-[92px] pointer-events-none ${className}`}>
+              {taslar.map((kayit, i) => (
+                <div
+                  key={`atilan-${oyuncuIdx}-${kayit.tas.id}-${i}`}
+                  className="absolute"
+                  style={{
+                    left: `${i * 10}px`,
+                    top: `${i * 4}px`,
+                    zIndex: i + 1,
+                    transform: `rotate(${baseRotate + (i - 1) * 4}deg)`,
+                  }}
+                >
+                  <Tas tas={kayit.tas} pasif />
+                </div>
+              ))}
+            </div>
+          );
+        };
+
         return (
-          <div className="absolute inset-0 z-[100] overflow-hidden flex flex-col"
+          <div className="okey-screen okey-pro-screen absolute inset-0 z-[100] overflow-hidden flex flex-col"
             style={{background: 'linear-gradient(180deg, #efe3ce 0%, #d7b982 38%, #3d2411 100%)'}}>
             {/* Lüks lounge arka planı — örneğe benzer, ama kopya olmayan sıcak salon atmosferi */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{zIndex:0}}>
@@ -3756,9 +4484,9 @@ export default function LoungeApp() {
             </div>
 
             {/* ÜST PANEL */}
-            <div className="relative z-10 flex justify-between items-center px-4 py-2 flex-shrink-0" style={{background: 'linear-gradient(90deg, rgba(20,30,55,0.88), rgba(57,31,15,0.72), rgba(20,30,55,0.88))', boxShadow:'0 8px 24px rgba(0,0,0,0.22)'}}>
+            <div className="hidden" style={{background: 'linear-gradient(90deg, rgba(20,30,55,0.88), rgba(57,31,15,0.72), rgba(20,30,55,0.88))', boxShadow:'0 8px 24px rgba(0,0,0,0.22)'}}>
               {/* Sol oyuncu (Bot 1) */}
-              <div onClick={() => { setOkeyProfilIndex(1); setOkeyProfilAcik(true); }} className="flex items-center gap-2 cursor-pointer hover:scale-[1.02] transition-transform">
+              <div onClick={() => oyunProfiliniAc(1)} className="flex items-center gap-2 cursor-pointer hover:scale-[1.02] transition-transform">
                 <div className="relative">
                   <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-indigo-800 border-2 border-purple-400 flex items-center justify-center text-lg font-black text-white shadow-lg">
                     {okeyDurum.oyuncular[1].isim[0]}
@@ -3774,7 +4502,7 @@ export default function LoungeApp() {
 
               {/* Orta: Karşı oyuncu (Bot 2) */}
               <div className="flex flex-col items-center gap-1">
-                <div onClick={() => { setOkeyProfilIndex(2); setOkeyProfilAcik(true); }} className="flex items-center gap-2 bg-black/50 border border-white/10 rounded-xl px-3 py-1 cursor-pointer hover:bg-black/65 transition-all">
+                <div onClick={() => oyunProfiliniAc(2)} className="flex items-center gap-2 bg-black/50 border border-white/10 rounded-xl px-3 py-1 cursor-pointer hover:bg-black/65 transition-all">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-cyan-700 border-2 border-teal-300 flex items-center justify-center text-base font-black text-white shadow">
                     {okeyDurum.oyuncular[2].isim[0]}
                   </div>
@@ -3810,7 +4538,7 @@ export default function LoungeApp() {
                   );
                 })()}
 
-                <div onClick={() => { setOkeyProfilIndex(3); setOkeyProfilAcik(true); }} className="flex items-center gap-2 cursor-pointer hover:scale-[1.02] transition-transform">
+                <div onClick={() => oyunProfiliniAc(3)} className="flex items-center gap-2 cursor-pointer hover:scale-[1.02] transition-transform">
                   <div className="relative">
                     <div className="w-11 h-11 rounded-full bg-gradient-to-br from-orange-600 to-red-800 border-2 border-orange-400 flex items-center justify-center text-lg font-black text-white shadow-lg">
                       {okeyDurum.oyuncular[3].isim[0]}
@@ -3831,7 +4559,7 @@ export default function LoungeApp() {
             {/* SOL SOHBET AÇMA KUTUSU */}
             <button
               onClick={() => setOkeySohbetAcik(true)}
-              className="absolute left-4 top-24 z-[120] w-[92px] h-[62px] rounded-2xl bg-gradient-to-br from-sky-300 via-blue-500 to-indigo-700 border-2 border-white/45 shadow-[0_10px_24px_rgba(21,101,192,0.45)] hover:scale-105 active:scale-95 transition-all flex flex-col items-center justify-center text-white font-black"
+              className="hidden"
               title="Sohbet">
               <span className="text-[26px] leading-none drop-shadow">🎙️</span>
               <span className="text-[11px] leading-none">Sohbet</span>
@@ -3976,14 +4704,14 @@ export default function LoungeApp() {
             )}
 
             {/* OYUNCU PROFİL DETAY PANELİ */}
-            {okeyProfilAcik && (
+            {okeyProfilAcik && okeyProfilIndex !== 0 && (
               <div className="absolute inset-0 z-[140] flex items-center justify-center bg-black/55 backdrop-blur-sm" onClick={() => setOkeyProfilAcik(false)}>
                 <div className="w-[470px] rounded-[2rem] border-4 border-sky-200/80 bg-gradient-to-b from-sky-100 via-white to-blue-100 shadow-[0_0_60px_rgba(96,165,250,0.45)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
                   <div className="relative h-32 bg-gradient-to-r from-blue-500 via-sky-400 to-cyan-300 overflow-hidden">
                     <div className="absolute inset-0 opacity-30" style={{backgroundImage:'radial-gradient(circle at 20% 20%, white 0 2px, transparent 2px), radial-gradient(circle at 70% 30%, white 0 2px, transparent 2px)', backgroundSize:'34px 34px'}}></div>
                     <button onClick={() => setOkeyProfilAcik(false)} className="absolute right-4 top-4 w-9 h-9 rounded-full bg-white/25 hover:bg-white/40 text-white font-black shadow">×</button>
-                    <div className="absolute left-6 -bottom-10 w-24 h-24 rounded-2xl bg-gradient-to-br from-amber-200 to-orange-500 border-4 border-white shadow-xl flex items-center justify-center text-4xl">
-                      {profilAvatarlari[okeyProfilIndex] || '👤'}
+                    <div className="absolute left-6 -bottom-10 w-24 h-24 overflow-hidden rounded-2xl bg-gradient-to-br from-amber-200 to-orange-500 border-4 border-white shadow-xl flex items-center justify-center text-4xl">
+                      <img src={oyunProfilResmi(okeyProfilIndex)} alt="" className="h-full w-full object-cover" />
                     </div>
                     <div className="absolute left-36 bottom-4 text-white drop-shadow">
                       <div className="flex items-center gap-2">
@@ -4032,14 +4760,226 @@ export default function LoungeApp() {
               </div>
             )}
 
+            {/* OKEY 16:9 UI LAYOUT */}
+            <div className="okey-layout-v2 absolute inset-0 z-10 overflow-hidden">
+              <button
+                onClick={() => setOkeySohbetAcik(true)}
+                className="okey-table-menu-v2"
+                title="Sohbet"
+              >
+                ☰
+              </button>
+              <button
+                onClick={() => { setOkeyAcik(false); setOkeyDurum(null); setOkeyDizMod('serbest'); }}
+                className="okey-table-close-v2"
+                aria-label="Oyundan çık"
+              >
+                ×
+              </button>
+
+              <OkeyProfilRozeti idx={2} yon="top" className="okey-seat-v2 okey-seat-top-v2" />
+              <OkeyProfilRozeti idx={1} yon="left" className="okey-seat-v2 okey-seat-left-v2" />
+              <OkeyProfilRozeti idx={3} yon="right" className="okey-seat-v2 okey-seat-right-v2" />
+              <OkeyProfilRozeti idx={0} yon="bottom" className="okey-seat-v2 okey-seat-self-v2" />
+
+              <div className="okey-table-v2">
+                <div className="okey-table-felt-v2" />
+                <div className="okey-table-watermark-v2">
+                  <span>LOUNGE</span>
+                  <b>101 CLUB</b>
+                </div>
+
+                {okeyDurum.gosterge && (() => {
+                  const g = okeyDurum.gosterge!;
+                  const gStil = TAS_RENKLER[g.renk] || TAS_RENKLER.siyah;
+                  const oStil = TAS_RENKLER[okeyDurum.okeyRenk] || TAS_RENKLER.siyah;
+                  const borderSinifi = (renk: string) => {
+                    if (renk === 'kirmizi') return 'border-red-300';
+                    if (renk === 'mavi') return 'border-blue-300';
+                    if (renk === 'sari') return 'border-yellow-300';
+                    if (renk === 'joker') return 'border-purple-300';
+                    return 'border-gray-400';
+                  };
+                  const bilgiTasi = (deger: number, renk: string, stil: typeof gStil) => (
+                    <div className={`okey-info-tile-v2 ${borderSinifi(renk)}`}>
+                      <span className={stil.text}>{deger}</span>
+                      <strong className={stil.text}>{stil.sembol}</strong>
+                      <em className={stil.text}>{deger}</em>
+                    </div>
+                  );
+                  return (
+                    <div className="okey-info-panel-v2">
+                      <div className="okey-info-card-v2">
+                        <small>Gösterge</small>
+                        {bilgiTasi(g.deger, g.renk, gStil)}
+                      </div>
+                      <div className="okey-info-card-v2">
+                        <small>Okey</small>
+                        {bilgiTasi(okeyDurum.okeyDeger, okeyDurum.okeyRenk, oStil)}
+                      </div>
+                      <div className="okey-rule-card-v2">
+                        <b>{okeyDurum.katlamali ? 'Katlamalı' : 'Katlamasız'}</b>
+                        <span>Açma {okeyDurum.minAcmaPuani || 101}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="okey-open-melds-v2">
+                  {okeyDurum.oyuncular.map((oy, idx) => oy.acildi && oy.acilanGruplar?.length ? (
+                    <div key={`acilan-${idx}`} className="okey-open-player-v2">
+                      <span>{oy.isim} · {oy.acikPuan}</span>
+                      <div>
+                        {oy.acilanGruplar.slice(0, 4).map((grup, gi) => (
+                          <div key={`g-${idx}-${gi}`} className="okey-open-group-v2">
+                            {grup.slice(0, 5).map(t => <Tas key={`acik-${idx}-${gi}-${t.id}`} tas={t} mini pasif />)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null)}
+                </div>
+
+                <div className="opponent-rack-v2 opponent-rack-top-v2">
+                  <img src="/okey-assets/rack-opponent-top.svg" alt="" />
+                </div>
+                <div className="opponent-rack-v2 opponent-rack-left-v2">
+                  <img src="/okey-assets/rack-opponent-side.svg" alt="" />
+                </div>
+                <div className="opponent-rack-v2 opponent-rack-right-v2">
+                  <img src="/okey-assets/rack-opponent-side.svg" alt="" />
+                </div>
+
+                <div className="okey-deck-area-v2">
+                  <button
+                    onClick={okeyTasCek}
+                    disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti || okeyDurum.kalanDeste.length === 0 || okeyDurum.oyuncuTasCektiMi || el.length >= 22}
+                    className={okeyDurum.aktifOyuncu === 0 && !okeyDurum.bitti && !okeyDurum.oyuncuTasCektiMi && el.length < 22 ? 'is-ready' : ''}
+                  >
+                    🂠
+                  </button>
+                  <span>{okeyDurum.kalanDeste.length}</span>
+                </div>
+
+                {renderAtilanTasKumesi(1, 'okey-discard-left-v2', -9)}
+                {renderAtilanTasKumesi(2, 'okey-discard-top-v2', 2)}
+                {renderAtilanTasKumesi(3, 'okey-discard-right-v2', 9)}
+
+                <div className="okey-turn-pill-v2">
+                  {okeyDurum.aktifOyuncu === 0 ? 'Sıra sende' : `${okeyDurum.oyuncular[okeyDurum.aktifOyuncu]?.isim} oynuyor`}
+                </div>
+              </div>
+
+              {renderAtilanTasKumesi(0, 'okey-discard-self-v2', -3)}
+
+              <button
+                type="button"
+                onClick={() => { setOkeySohbetAcik(true); setOkeySohbetSekme('oyun'); }}
+                className="okey-mini-chat-v2"
+              >
+                {(okeySohbetMesajlari.oyun?.slice(-2).length ? okeySohbetMesajlari.oyun.slice(-2) : [
+                  { id: 801, isim: 'Sistem', metin: 'Oyun içi konuşmalar burada görünür.', zaman: 'şimdi' }
+                ]).map((m) => (
+                  <span key={m.id}>
+                    <b>{m.isim}:</b> {m.metin}
+                  </span>
+                ))}
+              </button>
+
+              <div className="okey-hand-bar-v2">
+                <div className="okey-hand-stats-v2">
+                  <span>{el.length} taş</span>
+                  {okeyDurum.oyuncular[0].acildi && <span>Açıldı: {okeyDurum.oyuncular[0].acikPuan}</span>}
+                  {dizAnaliz && <span>{dizAnaliz.gruplar.length} per · {dizPuan} puan · {dizAnaliz.tekler.length} tek</span>}
+                </div>
+                <div className="okey-hand-actions-v2">
+                  {!okeyDurum.bitti && !okeyDurum.oyuncular[0].acildi && (() => {
+                    const a = okeyElAcmaAnalizi(okeyDurum.oyuncular[0].el);
+                    return a.acabilir ? (
+                      <button onClick={okeyElAc}>El Aç ({a.puan})</button>
+                    ) : <span>Açma: {a.puan}/101</span>;
+                  })()}
+                  {okeyDurum.bitti && (
+                    <button onClick={() => { setOkeyDurum(yeniOkeyOyunu(isim || 'Oyuncu')); setOkeyDizMod('serbest'); }}>
+                      Yeni El
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="okey-main-rack okey-main-rack-asset okey-main-rack-v2"
+                style={{
+                  background: istakaParlakZemin,
+                  boxShadow: `inset 0 4px 0 rgba(255,255,255,0.45), inset 0 18px 32px rgba(255,255,255,0.14), inset 0 -28px 38px rgba(0,0,0,0.62), 0 18px 0 rgba(65,28,8,0.95), 0 28px 36px rgba(0,0,0,0.62), 0 0 28px ${tema.renkB}66`,
+                }}>
+                <img src="/okey-assets/rack-main-premium.png" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-fill" />
+                <div
+                  className="okey-fan-rack-skin pointer-events-none absolute left-[8.5%] right-[8.5%] bottom-[14%] top-[59%] rounded-xl opacity-95"
+                  style={{ background: istakaTakimZemini }}
+                >
+                  <span className="okey-fan-rack-mark">{tema.logo}</span>
+                  <b>{tema.takim}</b>
+                </div>
+                <div
+                  ref={okeyIstakaRef}
+                  className="okey-rack-slots okey-rack-slots-v2 relative z-10 mx-auto select-none"
+                  onPointerUp={() => { setOkeyAktifSurukleme(null); }}>
+                  <div className="pointer-events-none absolute inset-0">
+                    {Array.from({ length: Math.max(28, el.length) }).map((_, i) => {
+                      const slot = tasVarsayilanPozisyon(i);
+                      return (
+                        <span
+                          key={`slot-${i}`}
+                          className="absolute rounded-lg border border-white/10 bg-black/10 shadow-inner"
+                          style={{ left: slot.x, top: slot.y, width: TAS_W, height: TAS_H }}
+                        />
+                      );
+                    })}
+                  </div>
+                  {el.map(renderIstakaTasi)}
+                </div>
+              </div>
+
+              <div className="okey-sort-buttons-v2">
+                <button onClick={() => okeyDizMod === 'seri' ? setOkeyDizMod('serbest') : okeyEliDiz('seri')} className={okeyDizMod === 'seri' ? 'is-active' : ''}>
+                  <span><i>1</i><i>2</i><i>3</i></span>
+                  <b>Seri Diz</b>
+                </button>
+                <button onClick={() => okeyDizMod === 'cift' ? setOkeyDizMod('serbest') : okeyEliDiz('cift')} className={okeyDizMod === 'cift' ? 'is-active' : ''}>
+                  <span><i>5</i><i>5</i><i>5</i></span>
+                  <b>Çift Diz</b>
+                </button>
+              </div>
+            </div>
+
             {/* MASA ALANI */}
-            <div className="relative z-10 flex-1 overflow-hidden mx-auto my-3 w-[88vw] max-w-[1240px] rounded-[1.35rem] border-[7px] border-white/95"
+            <div className="hidden okey-table-shell okey-asset-stage relative z-10 flex-1 overflow-hidden mx-auto my-2 w-[96vw] max-w-[1380px] rounded-[1.35rem] border-[7px] border-white/95"
               style={{
                 background: 'linear-gradient(180deg, rgba(255,246,224,0.98) 0%, rgba(226,202,158,0.96) 16%, rgba(54,101,177,0.98) 16%, rgba(54,101,177,0.98) 100%)',
                 boxShadow: '0 26px 60px rgba(0,0,0,0.50), inset 0 0 0 2px rgba(204,151,65,0.60)'
               }}>
+              <img src="/okey-assets/table-stage.svg" alt="" className="okey-stage-bg pointer-events-none absolute inset-0 h-full w-full object-fill" />
+              <button
+                onClick={() => setOkeySohbetAcik(true)}
+                className="okey-table-menu absolute left-5 top-5 z-[80] grid h-12 w-12 place-items-center rounded-2xl border border-white/30 bg-black/35 text-2xl font-black text-white shadow-[0_12px_28px_rgba(0,0,0,0.34)] backdrop-blur-md hover:bg-black/50"
+                title="Sohbet ve masa menüsü"
+              >
+                ☰
+              </button>
+              <button
+                onClick={() => { setOkeyAcik(false); setOkeyDurum(null); setOkeyDizMod('serbest'); }}
+                className="okey-table-close absolute right-5 top-5 z-[80] grid h-12 w-12 place-items-center rounded-full border-2 border-white/55 bg-black/30 text-4xl font-light leading-none text-white shadow-[0_0_25px_rgba(255,255,255,0.25)] hover:bg-white/15"
+                aria-label="Oyundan çık"
+              >
+                ×
+              </button>
+
+              <OkeyProfilRozeti idx={2} yon="top" className="okey-badge-top left-1/2 top-[9.8%] -translate-x-1/2 -translate-y-1/2" />
+              <OkeyProfilRozeti idx={1} yon="left" className="okey-badge-left left-[1.3%] top-[49%] -translate-y-1/2" />
+              <OkeyProfilRozeti idx={3} yon="right" className="okey-badge-right right-[1.3%] top-[49%] -translate-y-1/2" />
+
               {/* Salon dekoru: örnekteki gibi masa etrafında lüks oda hissi */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="okey-css-room-layer absolute inset-0 pointer-events-none overflow-hidden">
                 <div className="absolute left-0 right-0 top-0 h-[18%]" style={{background:'linear-gradient(180deg, rgba(255,247,229,0.92), rgba(204,166,103,0.38)), repeating-linear-gradient(90deg, rgba(116,72,28,0.12) 0 16px, transparent 16px 64px)'}}></div>
                 <div className="absolute left-[8%] top-[3%] w-20 h-32 rounded-b-full bg-gradient-to-b from-amber-100 to-amber-700/30 blur-[1px]"></div>
                 <div className="absolute right-[7%] top-[4%] w-24 h-28 rounded-b-full bg-gradient-to-b from-amber-100 to-amber-700/30 blur-[1px]"></div>
@@ -4050,51 +4990,61 @@ export default function LoungeApp() {
               </div>
 
               {/* Mavi oyun bezi */}
-              <div className="absolute left-4 right-4 top-[14%] bottom-5 rounded-b-[1.1rem] rounded-t-[2.3rem] border-x-[10px] border-b-[10px] border-t-[5px] border-amber-100/90"
+              <div className="okey-css-felt-layer absolute left-4 right-4 top-[14%] bottom-5 rounded-b-[1.1rem] rounded-t-[2.3rem] border-x-[10px] border-b-[10px] border-t-[5px] border-amber-100/90"
                 style={{
                   background: 'radial-gradient(circle at 50% 28%, rgba(138,184,255,0.36), transparent 34%), linear-gradient(180deg, rgba(71,119,197,0.98) 0%, rgba(48,93,176,0.98) 50%, rgba(36,73,149,0.99) 100%)',
                   boxShadow: 'inset 0 0 95px rgba(10,35,88,0.56), inset 0 0 0 3px rgba(255,255,255,0.12), 0 18px 32px rgba(0,0,0,0.24)'
                 }}></div>
-              <div className="absolute left-4 right-4 top-[14%] bottom-5 rounded-b-[1.1rem] rounded-t-[2.3rem] pointer-events-none opacity-30"
+              <div className="okey-css-felt-layer absolute left-4 right-4 top-[14%] bottom-5 rounded-b-[1.1rem] rounded-t-[2.3rem] pointer-events-none opacity-30"
                 style={{backgroundImage:'radial-gradient(circle at 35% 45%, rgba(255,255,255,0.22), transparent 14%), repeating-linear-gradient(135deg, rgba(255,255,255,0.075) 0 2px, transparent 2px 20px)'}}></div>
 
               {/* Üst duyuru bandı */}
-              <div className="absolute top-8 left-1/2 -translate-x-1/2 z-20 px-7 py-1.5 rounded-full bg-black/35 border border-white/20 text-white text-sm font-black shadow-lg">
+              <div className="okey-table-announcement absolute top-4 left-1/2 -translate-x-1/2 z-20 px-7 py-1.5 rounded-full bg-black/35 border border-white/20 text-white text-sm font-black shadow-lg">
                 📣 VIP seviyesine yükseldi, tüm oyuncular arasında göz kamaştırıcı bir oyuncu oldu!
               </div>
 
               {/* Masa logosu */}
-              <div className="absolute top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-16 select-none pointer-events-none flex items-center gap-3">
-                <span className="text-white/55 font-black text-4xl tracking-widest italic">SOHO</span>
-                <span className="text-white/55 text-4xl rotate-[-12deg]">🃏</span>
-                <span className="text-white/55 font-black text-4xl tracking-widest italic">OKEY</span>
+              <div className="okey-table-watermark absolute top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2 select-none pointer-events-none flex flex-col items-center">
+                <div className="okey-table-watermark-title">LOUNGE</div>
+                <div className="okey-table-watermark-sub">
+                  <span className="text-white/55 text-4xl rotate-[-10deg]">🃏</span>
+                  <strong>101 CLUB</strong>
+                </div>
               </div>
 
               {/* Oyun bilgileri: gösterge, okey, minimum açma ve katlamalı durumu */}
               {okeyDurum.gosterge && (() => {
                 const g = okeyDurum.gosterge!;
                 const r = TAS_RENKLER[g.renk] || TAS_RENKLER['siyah'];
+                const borderSinifi = (renk: string) => {
+                  if (renk === 'kirmizi') return 'border-red-300';
+                  if (renk === 'mavi') return 'border-blue-300';
+                  if (renk === 'sari') return 'border-yellow-300';
+                  return 'border-gray-400';
+                };
+                const bilgiTasi = (deger: number, renk: string, stil: typeof r) => (
+                  <div className={`okey-info-tile relative h-[58px] w-[42px] rounded-lg border-2 bg-white shadow-[0_5px_0_rgba(110,88,56,0.45),0_9px_14px_rgba(0,0,0,0.28)] ${borderSinifi(renk)}`}>
+                    <span className={`absolute left-1 top-0.5 text-[11px] font-black leading-none ${stil.text}`}>{deger}</span>
+                    <span className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg font-black ${stil.text}`}>{stil.sembol}</span>
+                    <span className={`absolute bottom-0.5 right-1 rotate-180 text-[11px] font-black leading-none ${stil.text}`}>{deger}</span>
+                  </div>
+                );
                 return (
-                  <div className="absolute right-[18%] top-[17%] z-40 flex items-center gap-3 rounded-2xl bg-black/45 border border-white/20 px-3 py-2 shadow-[0_10px_28px_rgba(0,0,0,0.35)] backdrop-blur-sm">
-                    <div className="flex flex-col items-center">
-                      <span className="text-[9px] text-white/70 font-black tracking-wider">GÖSTERGE</span>
-                      <div className={`w-9 h-12 rounded-lg bg-white border-2 flex flex-col items-center justify-between py-0.5 shadow-md ${r.text === 'text-red-600' ? 'border-red-300' : r.text === 'text-blue-600' ? 'border-blue-300' : r.text === 'text-yellow-500' ? 'border-yellow-300' : 'border-gray-400'}`}>
-                        <span className={`text-[10px] font-black leading-none ${r.text} w-full text-left pl-1`}>{g.deger}</span>
-                        <span className={`text-base font-black ${r.text}`}>{r.sembol}</span>
-                        <span className={`text-[10px] font-black leading-none ${r.text} rotate-180`}>{g.deger}</span>
-                      </div>
+                  <div className="okey-table-info-panel absolute right-[19%] top-[12.5%] z-40 flex items-center gap-2 rounded-xl bg-black/28 px-2 py-1.5 shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="text-[8px] font-black tracking-wider text-white/70">GÖSTERGE</span>
+                      {bilgiTasi(g.deger, g.renk, r)}
                     </div>
-                    <div className="text-white font-black leading-tight text-xs space-y-1">
-                      <div className="rounded-lg bg-yellow-400/20 border border-yellow-300/40 px-2 py-1 text-yellow-200">Okey: {okeyDurum.okeyDeger}</div>
-                      <div className="rounded-lg bg-sky-400/20 border border-sky-200/40 px-2 py-1 text-sky-100">Minimum açma: {okeyDurum.minAcmaPuani || 101}</div>
-                      <div className="rounded-lg bg-orange-400/20 border border-orange-200/40 px-2 py-1 text-orange-100">{okeyDurum.katlamali ? 'Katlamalı' : 'Katlamasız'}</div>
+                    <div className="okey-rule-badge min-w-[104px] rounded-xl bg-slate-950/45 px-3 py-2 text-right font-black leading-tight text-white shadow-inner">
+                      <div className="text-base">{okeyDurum.katlamali ? 'Katlamalı' : 'Katlamasız'}</div>
+                      <div className="mt-1 text-[11px] text-sky-100">Açma {okeyDurum.minAcmaPuani || 101}</div>
                     </div>
                   </div>
                 );
               })()}
 
               {/* Açılan eller — oyuncular 101'i bulunca perler masanın ortasında görünür */}
-              <div className="absolute left-1/2 top-[36%] -translate-x-1/2 z-[35] w-[48%] max-h-[190px] overflow-hidden pointer-events-none flex flex-col gap-2 items-center">
+              <div className="okey-open-melds absolute left-1/2 top-[36%] -translate-x-1/2 z-[35] w-[48%] max-h-[190px] overflow-hidden pointer-events-none flex flex-col gap-2 items-center">
                 {okeyDurum.oyuncular.map((oy, idx) => oy.acildi && oy.acilanGruplar?.length ? (
                   <div key={`acilan-${idx}`} className="rounded-2xl bg-black/22 border border-white/15 px-3 py-2 shadow-[0_10px_28px_rgba(0,0,0,0.22)] backdrop-blur-sm">
                     <div className="text-[10px] font-black text-cyan-100 mb-1">{oy.isim} açtı · {oy.acikPuan} puan</div>
@@ -4111,33 +5061,30 @@ export default function LoungeApp() {
 
               {/* Rakip ıstakaları — örnekteki gibi masa kenarına oturan lüks 3D ahşap ayaklar */}
               <div className="absolute top-[15.5%] left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
-                <div className="relative w-[430px] h-[78px]" style={{transform:'perspective(900px) rotateX(10deg)'}}>
-                  <div className="absolute inset-x-0 bottom-0 h-11 rounded-t-[1.4rem] border-x-4 border-t-4 border-amber-200/75 bg-gradient-to-r from-[#5b2d10] via-[#a2632b] to-[#5b2d10] shadow-[0_14px_22px_rgba(0,0,0,0.38),inset_0_4px_8px_rgba(255,235,180,0.25)]"></div>
-                  <div className="absolute left-12 right-12 top-3 h-4 rounded-full bg-white/20 blur-sm"></div>
+                <div className="opponent-rack opponent-rack-top relative w-[430px] h-[92px]" style={{transform:'perspective(900px) rotateX(12deg)'}}>
+                  <img src="/okey-assets/rack-opponent-top.svg" alt="" className="h-full w-full object-fill drop-shadow-[0_18px_20px_rgba(0,0,0,0.35)]" />
                 </div>
               </div>
 
-              <div className="absolute left-[8.2%] top-[25%] bottom-[16%] z-20 w-[92px]">
-                <div className="relative h-full" style={{transform:'perspective(900px) rotateY(-12deg)'}}>
-                  <div className="absolute left-5 top-0 bottom-0 w-14 rounded-[1.6rem] border-y-4 border-l-4 border-amber-200/75 bg-gradient-to-b from-[#5b2d10] via-[#a2632b] to-[#5b2d10] shadow-[12px_16px_26px_rgba(0,0,0,0.34),inset_4px_0_8px_rgba(255,235,180,0.22)]"></div>
-                  <div className="absolute left-4 top-8 bottom-8 w-3 rounded-full bg-white/18 blur-sm"></div>
+              <div className="okey-rack-side-left absolute left-[11.3%] top-[25%] bottom-[16%] z-20 w-[92px]">
+                <div className="opponent-rack opponent-rack-left relative h-full" style={{transform:'perspective(900px) rotateY(-14deg)'}}>
+                  <img src="/okey-assets/rack-opponent-side.svg" alt="" className="h-full w-full object-fill drop-shadow-[14px_18px_18px_rgba(0,0,0,0.34)]" />
                 </div>
               </div>
 
-              <div className="absolute right-[8.2%] top-[25%] bottom-[16%] z-20 w-[92px]">
-                <div className="relative h-full" style={{transform:'perspective(900px) rotateY(12deg)'}}>
-                  <div className="absolute right-5 top-0 bottom-0 w-14 rounded-[1.6rem] border-y-4 border-r-4 border-amber-200/75 bg-gradient-to-b from-[#5b2d10] via-[#a2632b] to-[#5b2d10] shadow-[-12px_16px_26px_rgba(0,0,0,0.34),inset_-4px_0_8px_rgba(255,235,180,0.22)]"></div>
-                  <div className="absolute right-4 top-8 bottom-8 w-3 rounded-full bg-white/18 blur-sm"></div>
+              <div className="okey-rack-side-right absolute right-[11.3%] top-[25%] bottom-[16%] z-20 w-[92px]">
+                <div className="opponent-rack opponent-rack-right relative h-full" style={{transform:'perspective(900px) rotateY(14deg)'}}>
+                  <img src="/okey-assets/rack-opponent-side.svg" alt="" className="h-full w-full scale-x-[-1] object-fill drop-shadow-[-14px_18px_18px_rgba(0,0,0,0.34)]" />
                 </div>
               </div>
 
               {/* SAĞ ÜST: Deste + sayaç */}
-              <div className="absolute right-[9%] top-[18%] z-40 flex items-center gap-4">
+              <div className="okey-deck-area absolute right-[9%] top-[18%] z-40 flex items-center gap-4">
                 {/* Deste */}
                 <div className="flex flex-col items-center gap-1">
                   <button onClick={okeyTasCek}
-                    disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti || okeyDurum.kalanDeste.length === 0}
-                    className={`relative group transition-all ${okeyDurum.aktifOyuncu === 0 && !okeyDurum.bitti ? 'cursor-pointer hover:scale-110' : 'opacity-60 cursor-not-allowed'}`}>
+                    disabled={okeyDurum.aktifOyuncu !== 0 || okeyDurum.bitti || okeyDurum.kalanDeste.length === 0 || okeyDurum.oyuncuTasCektiMi || el.length >= 22}
+                    className={`relative group transition-all ${okeyDurum.aktifOyuncu === 0 && !okeyDurum.bitti && !okeyDurum.oyuncuTasCektiMi && el.length < 22 ? 'cursor-pointer hover:scale-110' : 'opacity-60 cursor-not-allowed'}`}>
                     <div className="absolute -top-1 -left-1 w-10 h-14 rounded-lg border-2 border-amber-700" style={{background: 'linear-gradient(135deg, #7c5a2e, #4a3018)'}}></div>
                     <div className="absolute top-0 left-0 w-10 h-14 rounded-lg border-2 border-amber-600" style={{background: 'linear-gradient(135deg, #8c6a3e, #5a4028)'}}></div>
                     <div className="relative w-10 h-14 rounded-lg border-2 border-amber-500 flex items-center justify-center shadow-xl" style={{background: 'linear-gradient(135deg, #9c7a4e, #6a5038)'}}>
@@ -4155,34 +5102,13 @@ export default function LoungeApp() {
 
 
               {/* Oyuncuların attığı taşlar kendi kenarlarında görünür */}
-              <div className="absolute left-[19%] top-[25%] z-30 rotate-[-8deg]">
-                {(() => {
-                  const sonAtilan = okeyDurum.atilanTasGecmisi?.filter(x => x.oyuncuIdx === 1).slice(-1)[0];
-                  return sonAtilan ? <Tas key={sonAtilan.tas.id} tas={sonAtilan.tas} disabled /> : null;
-                })()}
-              </div>
-              <div className="absolute left-1/2 top-[16%] -translate-x-1/2 z-30 rotate-[3deg]">
-                {(() => {
-                  const sonAtilan = okeyDurum.atilanTasGecmisi?.filter(x => x.oyuncuIdx === 2).slice(-1)[0];
-                  return sonAtilan ? <Tas key={sonAtilan.tas.id} tas={sonAtilan.tas} disabled /> : null;
-                })()}
-              </div>
-              <div className="absolute right-[19%] top-[25%] z-30 rotate-[8deg]">
-                {(() => {
-                  const sonAtilan = okeyDurum.atilanTasGecmisi?.filter(x => x.oyuncuIdx === 3).slice(-1)[0];
-                  return sonAtilan ? <Tas key={sonAtilan.tas.id} tas={sonAtilan.tas} disabled /> : null;
-                })()}
-              </div>
-
-              <div className="absolute left-1/2 bottom-[9%] -translate-x-1/2 z-30 rotate-[-2deg]">
-                {(() => {
-                  const sonAtilan = okeyDurum.atilanTasGecmisi?.filter(x => x.oyuncuIdx === 0).slice(-1)[0];
-                  return sonAtilan ? <Tas key={sonAtilan.tas.id} tas={sonAtilan.tas} disabled /> : null;
-                })()}
-              </div>
+              {renderAtilanTasKumesi(1, 'okey-discard-left left-[18%] top-[26%]', -9)}
+              {renderAtilanTasKumesi(2, 'okey-discard-top left-1/2 top-[17.5%] -translate-x-1/2', 2)}
+              {renderAtilanTasKumesi(3, 'okey-discard-right right-[18%] top-[26%]', 9)}
+              {renderAtilanTasKumesi(0, 'okey-discard-self right-[21%] bottom-[10.5%]', -3)}
 
               {/* OYUN İÇİ CANLI SOHBET — panel açmadan masada görünür */}
-              <div className="absolute left-6 bottom-6 z-20 w-[360px] pointer-events-none">
+              <div className="okey-table-live-chat absolute left-6 bottom-6 z-20 w-[360px] pointer-events-none">
                 <div className="rounded-2xl bg-black/35 backdrop-blur-sm border border-white/10 px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.35)] space-y-1">
                   {(okeySohbetMesajlari.oyun?.slice(-3).length ? okeySohbetMesajlari.oyun.slice(-3) : [
                     { id: 801, isim: 'Sistem', metin: 'Masa sohbeti burada canlı görünür.', zaman: 'şimdi' }
@@ -4203,15 +5129,15 @@ export default function LoungeApp() {
             </div>
 
             {/* ALT PANEL: Istaka + Oyuncu eli + Kontroller */}
-            <div className="relative z-10 flex-shrink-0" style={{background: 'linear-gradient(180deg, rgba(72,38,12,0.95) 0%, rgba(32,15,5,0.98) 100%)', borderTop: '3px solid #d39b45', boxShadow:'0 -14px 34px rgba(0,0,0,0.28)'}}>
+            <div className="hidden okey-player-dock relative z-10 flex-shrink-0" style={{background: 'linear-gradient(180deg, rgba(72,38,12,0.95) 0%, rgba(32,15,5,0.98) 100%)', borderTop: '3px solid #d39b45', boxShadow:'0 -14px 34px rgba(0,0,0,0.28)'}}>
 
               {/* Istaka + el bilgisi satırı */}
               <div className="flex justify-between items-center px-4 py-1.5 border-b border-amber-900/50">
                 {/* Sol: Oyuncu profili + istaka */}
-                <div onClick={() => { setOkeyProfilIndex(0); setOkeyProfilAcik(true); }} className="flex items-center gap-3 cursor-pointer hover:scale-[1.01] transition-transform">
+                <div onClick={() => oyunProfiliniAc(0)} className="flex items-center gap-3 cursor-pointer hover:scale-[1.01] transition-transform">
                   <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 to-orange-800 border-4 border-amber-400 flex items-center justify-center text-xl font-black text-white shadow-lg border-2">
-                      {isim[0]?.toUpperCase()}
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-600 to-orange-800 border-4 border-amber-400 flex items-center justify-center overflow-hidden text-xl font-black text-white shadow-lg border-2">
+                      <img src={oyunProfilResmi(0)} alt="" className="h-full w-full object-cover" />
                     </div>
                     <div className="absolute -bottom-1 -right-1 bg-amber-500 text-black text-[8px] font-black px-1 rounded border border-black">V{vipSeviyesi}</div>
                   </div>
@@ -4248,61 +5174,93 @@ export default function LoungeApp() {
                   {!okeyDurum.bitti && !okeyDurum.oyuncular[0].acildi && (() => { const a = okeyElAcmaAnalizi(okeyDurum.oyuncular[0].el); return a.acabilir ? (
                     <button onClick={okeyElAc} className="bg-gradient-to-r from-emerald-400 to-cyan-400 text-black font-black px-4 py-1.5 rounded-lg text-xs hover:brightness-110">✅ El Aç ({a.puan})</button>
                   ) : <div className="rounded-lg bg-black/20 border border-white/10 px-3 py-1.5 text-[10px] font-black text-white/50">Açma: {a.puan}/101</div>; })()}
-                  {okeyDurum.bitti ? (
+                  {okeyDurum.bitti && (
                     <button onClick={() => { setOkeyDurum(yeniOkeyOyunu(isim || 'Oyuncu')); setOkeyDizMod('serbest'); }}
                       className="bg-gradient-to-r from-orange-500 to-amber-500 text-black font-black px-4 py-1.5 rounded-lg text-xs hover:brightness-110">
                       🔄 Yeni El
                     </button>
-                  ) : (
-                    <div className="rounded-lg bg-black/30 border border-white/10 px-4 py-1.5 text-[11px] font-black text-white/70">Oyun otomatik biter</div>
                   )}
                 </div>
               </div>
 
               {/* EL — 3D Istaka üzerinde taşlar */}
+              <button
+                type="button"
+                onClick={() => { setOkeySohbetAcik(true); setOkeySohbetSekme('oyun'); }}
+                className="okey-dock-chat-strip text-left"
+              >
+                {(okeySohbetMesajlari.oyun?.slice(-2).length ? okeySohbetMesajlari.oyun.slice(-2) : [
+                  { id: 801, isim: 'Sistem', metin: 'Masa sohbeti burada görünür.', zaman: 'şimdi' }
+                ]).map((m) => (
+                  <span key={m.id} className="block truncate">
+                    <b>{m.isim}:</b> {m.metin}
+                  </span>
+                ))}
+              </button>
+
               <div className="px-4 pt-3 pb-4">
-                <div className={`relative mx-auto max-w-[980px] min-h-[142px] rounded-t-2xl border-x-4 border-t-4 ${tema.kenarlık} overflow-visible ${tema.efekt}`}
+                <div className={`okey-main-rack okey-main-rack-asset relative mx-auto max-w-[980px] min-h-[142px] rounded-t-2xl border-x-4 border-t-4 ${tema.kenarlık} overflow-visible ${tema.efekt}`}
                   style={{
                     background: istakaParlakZemin,
                     boxShadow: `inset 0 4px 0 rgba(255,255,255,0.45), inset 0 18px 32px rgba(255,255,255,0.14), inset 0 -28px 38px rgba(0,0,0,0.62), 0 18px 0 rgba(65,28,8,0.95), 0 28px 36px rgba(0,0,0,0.62), 0 0 28px ${tema.renkB}66`,
                     transform: 'perspective(900px) rotateX(5deg)',
                     transformOrigin: 'bottom center'
                   }}>
-                  <div className="absolute left-4 right-4 top-3 h-8 rounded-full bg-white/18 blur-sm opacity-65 pointer-events-none"></div>
-                  <div className="absolute left-4 right-4 top-[58px] h-[4px] rounded-full bg-black/35 shadow-inner"></div>
-                  <div className="absolute left-1/2 top-7 -translate-x-1/2 w-28 h-16 rounded-2xl border-2 border-white/25 bg-black/20 flex flex-col items-center justify-center shadow-[0_8px_18px_rgba(0,0,0,0.35)] pointer-events-none">
+                  <img src="/okey-assets/rack-main-premium.png" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-fill" />
+                  <div
+                    className="okey-fan-rack-skin pointer-events-none absolute left-[8.5%] right-[8.5%] bottom-[14%] top-[59%] rounded-xl opacity-95"
+                    style={{ background: istakaTakimZemini }}
+                  >
+                    <span className="okey-fan-rack-mark">{tema.logo}</span>
+                    <b>{tema.takim}</b>
+                  </div>
+                  <div className="rack-css-deco absolute left-4 right-4 top-3 h-8 rounded-full bg-white/18 blur-sm opacity-65 pointer-events-none"></div>
+                  <div className="rack-css-deco absolute left-4 right-4 top-[58px] h-[4px] rounded-full bg-black/35 shadow-inner"></div>
+                  <div className="rack-css-deco absolute left-1/2 top-7 -translate-x-1/2 w-28 h-16 rounded-2xl border-2 border-white/25 bg-black/20 flex flex-col items-center justify-center shadow-[0_8px_18px_rgba(0,0,0,0.35)] pointer-events-none">
                     <div className="text-2xl font-black leading-none" style={{color: tema.metinRenk}}>{tema.logo}</div>
                     <div className="text-[9px] font-black tracking-widest" style={{color: tema.metinRenk}}>{tema.takim}</div>
                   </div>
-                  <div className="absolute left-0 right-0 bottom-0 h-8 rounded-b-xl"
+                  <div className="rack-css-deco absolute left-0 right-0 bottom-0 h-8 rounded-b-xl"
                     style={{background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.35))'}}></div>
 
                   <div
                     ref={okeyIstakaRef}
-                    className="relative z-10 mx-5 mt-3 h-[142px] select-none"
+                    className="okey-rack-slots relative z-10 mx-auto mt-3 h-[136px] w-[704px] max-w-[calc(100%_-_32px)] select-none"
                     onPointerUp={() => { setOkeyAktifSurukleme(null); }}>
+                    <div className="pointer-events-none absolute inset-0">
+                      {Array.from({ length: Math.max(28, el.length) }).map((_, i) => {
+                        const slot = tasVarsayilanPozisyon(i);
+                        return (
+                          <span
+                            key={`slot-${i}`}
+                            className="absolute rounded-lg border border-white/10 bg-black/10 shadow-inner"
+                            style={{ left: slot.x, top: slot.y, width: TAS_W, height: TAS_H }}
+                          />
+                        );
+                      })}
+                    </div>
                     {el.map(renderIstakaTasi)}
                   </div>
 
                   {/* Taş atmak için kutu yok: taşı ıstakadan yukarı/masa alanına sürükleyip bırak. */}
 
 
-                  <div className="absolute left-1/2 bottom-2 -translate-x-1/2 font-black tracking-widest select-none flex items-center gap-3 opacity-80" style={{color: tema.metinRenk}}>
+                  <div className="rack-css-deco absolute left-1/2 bottom-2 -translate-x-1/2 font-black tracking-widest select-none flex items-center gap-3 opacity-80" style={{color: tema.metinRenk}}>
                     <span className="text-3xl drop-shadow-[0_3px_5px_rgba(0,0,0,0.65)]">{tema.logo}</span>
                     <span className="text-xl drop-shadow-[0_3px_5px_rgba(0,0,0,0.65)]">{tema.takim}</span>
                   </div>
                 </div>
-                <div className="mx-auto max-w-[1000px] h-5 rounded-b-2xl border-x-4 border-b-4 border-black/70"
+                <div className="rack-css-bottom mx-auto max-w-[1000px] h-5 rounded-b-2xl border-x-4 border-b-4 border-black/70"
                   style={{background: `linear-gradient(180deg, ${tema.renkC || tema.renkA} 0%, #090909 100%)`, boxShadow: '0 10px 20px rgba(0,0,0,0.55)'}}></div>
                 <div className="text-center text-[10px] text-white/45 font-bold mt-1">Taşı basılı tutup sağa-sola diz · Taş atmak için ıstakadan yukarı/masaya sürükleyip bırak</div>
               </div>
 
               {/* Seri Diz / Çift Diz butonları — resimdeki gibi sağ köşe altın kartlar */}
-              <div className="absolute bottom-3 right-3 flex flex-col gap-2" style={{zIndex:20}}>
+              <div className="okey-sort-buttons absolute bottom-8 right-4 flex flex-col gap-2" style={{zIndex:20}}>
                 {/* SERİ DİZ */}
                 <button
                   onClick={() => okeyDizMod === 'seri' ? setOkeyDizMod('serbest') : okeyEliDiz('seri')}
-                  className="relative overflow-hidden transition-all active:scale-95"
+                  className="okey-sort-action relative overflow-hidden transition-all active:scale-95"
                   style={{
                     width: '80px', height: '62px',
                     borderRadius: '10px',
@@ -4347,7 +5305,7 @@ export default function LoungeApp() {
                 {/* ÇİFT DİZ */}
                 <button
                   onClick={() => okeyDizMod === 'cift' ? setOkeyDizMod('serbest') : okeyEliDiz('cift')}
-                  className="relative overflow-hidden transition-all active:scale-95"
+                  className="okey-sort-action relative overflow-hidden transition-all active:scale-95"
                   style={{
                     width: '80px', height: '62px',
                     borderRadius: '10px',
@@ -4396,7 +5354,7 @@ export default function LoungeApp() {
       {/* MODAL: PİŞTİ OYUN EKRANI                                  */}
       {/* ======================================================== */}
       {pistiAcik && pistiDurum && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl">
+        <div className="pisti-screen absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl">
           <div className="w-[820px] bg-gradient-to-b from-slate-900 to-slate-950 border border-blue-500/30 rounded-3xl shadow-[0_0_80px_rgba(59,130,246,0.3)] overflow-hidden flex flex-col">
 
             {/* Başlık Bar */}
@@ -4589,7 +5547,7 @@ export default function LoungeApp() {
       {/* MODAL: TAVLA OYUN EKRANI                                   */}
       {/* ======================================================== */}
       {tavlaAcik && tavlaDurum && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl">
+        <div className="tavla-screen absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl">
           <div className="w-[900px] bg-gradient-to-b from-slate-900 to-slate-950 border border-emerald-500/30 rounded-3xl shadow-[0_0_80px_rgba(16,185,129,0.2)] overflow-hidden flex flex-col">
 
             {/* Başlık Bar */}
@@ -4802,11 +5760,11 @@ export default function LoungeApp() {
       {/* MODAL: MASA AÇ — OYUN SEÇİM EKRANI                       */}
       {/* ======================================================== */}
       {oyunSecimAcik && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md">
-          <div className="relative w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 border border-white/10 rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.8)] overflow-hidden">
+        <div className="game-select-modal absolute inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md">
+          <div className="game-select-card relative w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 border border-white/10 rounded-3xl shadow-[0_0_60px_rgba(0,0,0,0.8)] overflow-hidden">
             
             {/* Başlık */}
-            <div className="bg-gradient-to-r from-purple-700 to-indigo-700 px-6 py-4 flex justify-between items-center">
+            <div className="game-select-header bg-gradient-to-r from-purple-700 to-indigo-700 px-6 py-4 flex justify-between items-center">
               <div>
                 <h2 className="font-black text-xl text-white tracking-wide drop-shadow">🎮 Masa Aç</h2>
                 <p className="text-purple-200 text-[11px] mt-0.5">Oyun türünü seç, masanı aç</p>
@@ -4818,12 +5776,12 @@ export default function LoungeApp() {
             </div>
 
             {/* Oyun Kartları */}
-            <div className="p-5 flex flex-col gap-3">
+            <div className="game-select-options p-5 flex flex-col gap-3">
 
               {/* Okey */}
               <button
                 onClick={() => masaAc("101 Okey")}
-                className="group w-full bg-gradient-to-r from-orange-600/20 to-amber-600/20 hover:from-orange-600/40 hover:to-amber-600/40 border border-orange-500/40 hover:border-orange-400 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98]"
+                className="game-select-option group w-full bg-gradient-to-r from-orange-600/20 to-amber-600/20 hover:from-orange-600/40 hover:to-amber-600/40 border border-orange-500/40 hover:border-orange-400 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98]"
               >
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-3xl shadow-lg flex-shrink-0">🀄</div>
                 <div className="text-left flex-1">
@@ -4836,7 +5794,7 @@ export default function LoungeApp() {
               {/* Pişti */}
               <button
                 onClick={() => masaAc("Pişti")}
-                className="group w-full bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/40 hover:to-indigo-600/40 border border-blue-500/40 hover:border-blue-400 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98]"
+                className="game-select-option group w-full bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/40 hover:to-indigo-600/40 border border-blue-500/40 hover:border-blue-400 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98]"
               >
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-3xl shadow-lg flex-shrink-0">🃏</div>
                 <div className="text-left flex-1">
@@ -4849,7 +5807,7 @@ export default function LoungeApp() {
               {/* Tavla */}
               <button
                 onClick={() => masaAc("Tavla")}
-                className="group w-full bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-600/40 hover:to-teal-600/40 border border-emerald-500/40 hover:border-emerald-400 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98]"
+                className="game-select-option group w-full bg-gradient-to-r from-emerald-600/20 to-teal-600/20 hover:from-emerald-600/40 hover:to-teal-600/40 border border-emerald-500/40 hover:border-emerald-400 rounded-2xl p-4 flex items-center gap-4 transition-all active:scale-[0.98]"
               >
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-3xl shadow-lg flex-shrink-0">🎲</div>
                 <div className="text-left flex-1">
@@ -4862,7 +5820,7 @@ export default function LoungeApp() {
             </div>
 
             {/* Alt bilgi */}
-            <div className="px-5 pb-5">
+            <div className="game-select-footnote px-5 pb-5">
               <p className="text-center text-gray-600 text-[10px]">Masana katılmak isteyen oyuncular seni bulacak</p>
             </div>
           </div>

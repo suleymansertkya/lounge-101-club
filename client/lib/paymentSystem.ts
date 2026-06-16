@@ -1,9 +1,10 @@
-export type PaymentProductKind = "chips" | "vip" | "cue" | "cueGift";
+export type PaymentProductKind = "chips" | "diamonds" | "vip" | "cue" | "cueGift";
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 
 export interface PaymentEntitlement {
   kind: PaymentProductKind;
   chips?: number;
+  diamonds?: number;
   vipLevel?: number;
   cueId?: number;
   giftTargetId?: string;
@@ -110,4 +111,3 @@ export function markPaymentPaid(input: {
   paymentStore.processedProviderEvents.add(input.eventId);
   return order;
 }
-

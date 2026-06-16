@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { amountTextToKurus, createPaymentOrder, type PaymentEntitlement, type PaymentProductKind } from "@/lib/paymentSystem";
 
-const validKinds: PaymentProductKind[] = ["chips", "vip", "cue", "cueGift"];
+const validKinds: PaymentProductKind[] = ["chips", "diamonds", "vip", "cue", "cueGift"];
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
   const entitlement: PaymentEntitlement = {
     kind,
     chips: Number(body.chips || 0) || undefined,
+    diamonds: Number(body.diamonds || 0) || undefined,
     vipLevel: Number(body.vipLevel || 0) || undefined,
     cueId: Number(body.cueId || 0) || undefined,
     giftTargetId: body.giftTargetId ? String(body.giftTargetId) : undefined,
@@ -48,4 +49,3 @@ export async function POST(request: Request) {
     currency: order.currency,
   });
 }
-
